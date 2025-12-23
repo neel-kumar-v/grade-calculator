@@ -2,11 +2,19 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, Plus, Trash, Check } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  ContextMenuCheckboxItem,
+  ContextMenuSeparator,
+} from "./ui/context-menu";
 import { CreateCourseModal } from "./CreateCourseModal";
 import type { Doc, Id } from "../convex/_generated/dataModel";
 import { percentageToGPA } from "./GradingPeriods";
@@ -43,6 +51,7 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   const [gradeValues, setGradeValues] = useState<Record<number, string>>({});
   const updateCourse = useMutation(api.gradingPeriods.updateCourse);
   const updateGrades = useMutation(api.gradingPeriods.updateGrades);
+  const removeCourse = useMutation(api.gradingPeriods.removeCourse);
 
   const hasCourses = gradingPeriod.courses.length > 0;
   const totalCredits = calculateTotalCredits(gradingPeriod);
@@ -171,34 +180,73 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
       ) : (
         <div className="flex flex-col gap-2">
           {gradingPeriod.courses.map((course, index) => (
-            <Link
-              key={index}
-              href={`/${gradingPeriodId}/${index}`}
-              className="block"
-            >
-              <div className="p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="text-base font-semibold">{course.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {course.credits} credit
-                      {course.credits !== 1 ? "s" : ""}
+            <ContextMenu key={index}>
+              <ContextMenuTrigger asChild>
+                <Link
+                  href={`/${gradingPeriodId}/${index}`}
+                  className="block"
+                >
+                  <div className="p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="text-base font-semibold">{course.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {course.credits} credit
+                          {course.credits !== 1 ? "s" : ""}
+                        </div>
+                      </div>
+                      <div className="flex flex-row gap-4">
+                        {typeof course.grade === "number" && (
+                          <div className="flex items-center gap-2 text-md font-medium text-muted-foreground">
+                            {course.grade.toFixed(2)}%
+                          </div>
+                        )}
+                        <span className="text-xl flex items-center min-w-10 justify-center font-semibold">
+                          {convertGradeToLetter(course.grade)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex flex-row gap-4">
-                    {typeof course.grade === "number" && (
-                      <div className="flex items-center gap-2 text-md font-medium text-muted-foreground">
-                        {course.grade.toFixed(2)}%
-                      </div>
-                    )}
-                    <span className="text-xl flex items-center min-w-10 justify-center font-semibold">
-                      {convertGradeToLetter(course.grade)}
-                    </span>
-                  </div>
-
-                </div>
-              </div>
-            </Link>
+                </Link>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuCheckboxItem
+                  checked={course.part_of_degree}
+                  onCheckedChange={async (checked) => {
+                    const updatedCourse = {
+                      ...course,
+                      part_of_degree: checked,
+                    };
+                    await updateCourse({
+                      gradingPeriodId,
+                      courseIndex: index,
+                      course: updatedCourse,
+                    });
+                    // Trigger GPA refresh
+                    await updateGrades({ id: gradingPeriodId });
+                  }}
+                >
+                  Part of Core Curriculum
+                </ContextMenuCheckboxItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  variant="destructive"
+                  onClick={async (e: React.MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    await removeCourse({
+                      gradingPeriodId,
+                      courseIndex: index,
+                    });
+                    // Trigger GPA refresh
+                    await updateGrades({ id: gradingPeriodId });
+                  }}
+                >
+                  <Trash className="size-4" />
+                  Delete Course
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           ))}
         </div>
       )}
