@@ -71,8 +71,8 @@ export const create = mutation({
       courses: coursesWithGPA,
       grade,
       core_grade,
-      gpa,
-      core_gpa,
+      gpa: gpa ?? undefined,
+      core_gpa: core_gpa ?? undefined,
       userId,
     });
   },
@@ -292,8 +292,8 @@ export const updateGrades = mutation({
       courses: coursesWithGPA,
       grade, 
       core_grade,
-      gpa,
-      core_gpa,
+      gpa: gpa ?? undefined,
+      core_gpa: core_gpa ?? undefined,
     });
   },
 });
@@ -330,8 +330,8 @@ export const addCourse = mutation({
       courses: updatedCourses,
       grade,
       core_grade,
-      gpa,
-      core_gpa,
+      gpa: gpa ?? undefined,
+      core_gpa: core_gpa ?? undefined,
     });
 
     return {
@@ -383,8 +383,53 @@ export const updateCourse = mutation({
       courses, 
       grade, 
       core_grade,
-      gpa,
-      core_gpa,
+      gpa: gpa ?? undefined,
+      core_gpa: core_gpa ?? undefined,
+    });
+  },
+});
+
+export const removeCourse = mutation({
+  args: {
+    gradingPeriodId: v.id("gradingPeriods"),
+    courseIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId(ctx);
+    const gradingPeriod = await ctx.db.get(args.gradingPeriodId);
+
+    if (!gradingPeriod) {
+      throw new Error("GradingPeriod not found");
+    }
+
+    if (gradingPeriod.userId !== userId) {
+      throw new Error("Unauthorized: You can only update your own gradingPeriods");
+    }
+
+    const index = Math.floor(args.courseIndex);
+    if (
+      !Number.isFinite(index) ||
+      index < 0 ||
+      index >= (gradingPeriod.courses?.length ?? 0)
+    ) {
+      throw new Error("Course not found");
+    }
+
+    const courses = [...gradingPeriod.courses];
+    courses.splice(index, 1);
+
+    // Recalculate grades and GPAs
+    const grade = calculateGradingPeriodGrade(courses);
+    const core_grade = calculateCoreGrade(courses);
+    const gpa = calculateGradingPeriodGPA(courses);
+    const core_gpa = calculateCoreGPA(courses);
+
+    await ctx.db.patch(args.gradingPeriodId, {
+      courses,
+      grade,
+      core_grade,
+      gpa: gpa ?? undefined,
+      core_gpa: core_gpa ?? undefined,
     });
   },
 });

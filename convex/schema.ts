@@ -11,10 +11,9 @@ export const category = v.object({
   name: v.string(),
   weight: v.number(),
   evenly_weighted: v.boolean(),
-  drops: v.optional(v.number()),
-  replace_policy: v.optional(v.object({
+  drop_policy: v.optional(v.object({
     drop_count: v.number(),
-    drop_with: v.id("courses"),
+    drop_with: v.optional(v.number()), // category index to replace with, or undefined to drop completely
   })),
   extra_credit: v.boolean(),
   manual: v.boolean(),

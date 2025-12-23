@@ -14,8 +14,15 @@ import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { CreateCategoryModal } from "./CreateCategoryModal";
-import { Plus, Trash } from "lucide-react";
+import { Plus, Trash, TriangleAlert } from "lucide-react";
 
 type GradingPeriod = Doc<"gradingPeriods">;
 type Course = GradingPeriod["courses"][number];
@@ -63,13 +70,55 @@ function assignmentPercent(a: Assignment): number {
   return a.score / a.max_score;
 }
 
-function categoryGrade(category: Category): number {
+function categoryGrade(category: Category, allCategories?: Category[]): number {
   if (!category) return 0;
   if (category.manual) {
     return category.grade / 100;
   }
-  const assignments = category.assignments ?? [];
+  let assignments = [...(category.assignments ?? [])];
   if (!assignments.length) return 0;
+
+  // Apply drop policy if configured
+  if (category.drop_policy && category.drop_policy.drop_count > 0) {
+    const dropCount = category.drop_policy.drop_count;
+    if (dropCount > 0 && assignments.length > dropCount) {
+      // Create array with indices to track original positions
+      const withIndices = assignments.map((a, idx) => ({ assignment: a, index: idx }));
+      // Sort by percentage (lowest first)
+      withIndices.sort((a, b) => {
+        const percentA = assignmentPercent(a.assignment);
+        const percentB = assignmentPercent(b.assignment);
+        return percentA - percentB;
+      });
+
+      // Get the lowest N assignment indices to drop/replace
+      const toDropIndices = new Set(withIndices.slice(0, dropCount).map(item => item.index));
+
+      if (category.drop_policy.drop_with === undefined) {
+        // Drop completely: remove them from the assignments array
+        assignments = assignments.filter((_, idx) => !toDropIndices.has(idx));
+      } else {
+        // Replace with grade from another category
+        const replaceCategoryIndex = category.drop_policy.drop_with;
+        if (allCategories && allCategories[replaceCategoryIndex]) {
+          const replaceCategory = allCategories[replaceCategoryIndex];
+          const replaceGrade = categoryGrade(replaceCategory, allCategories);
+          // Replace the lowest assignments with the grade from the other category
+          // We'll represent this by adjusting the scores to match the replacement grade
+          assignments = assignments.map((assignment, idx) => {
+            if (toDropIndices.has(idx)) {
+              return {
+                score: replaceGrade * assignment.max_score,
+                max_score: assignment.max_score,
+              };
+            }
+            return assignment;
+          });
+        }
+      }
+    }
+  }
+
   if (category.evenly_weighted) {
     const avg =
       assignments.reduce((sum, a) => sum + assignmentPercent(a), 0) /
@@ -88,7 +137,7 @@ function finalCourseGrade(course: Course): number {
   let numerator = 0;
   let denominator = 0;
   for (const cat of categories) {
-    const grade = categoryGrade(cat);
+    const grade = categoryGrade(cat, categories);
     if (cat.extra_credit) {
       numerator += cat.weight * grade;
     } else {
@@ -111,6 +160,8 @@ export function CourseCategories({
   const [draftCourse, setDraftCourse] = useState<Course | null>(null);
   const [liveCourse, setLiveCourse] = useState<Course>(() => normalizeCourse(course));
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  // Track input string values for decimal inputs
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
 
   const normalized = useMemo(() => normalizeCourse(course), [course]);
   useEffect(() => {
@@ -142,7 +193,7 @@ export function CourseCategories({
 
   const normalizeForSave = (c: Course): Course => {
   const categories: Category[] = (c.categories ?? []).map((cat) => {
-      const gradeNumber = categoryGrade(cat) * 100;
+      const gradeNumber = categoryGrade(cat, c.categories ?? []) * 100;
       return {
         ...cat,
         grade: gradeNumber,
@@ -193,7 +244,7 @@ export function CourseCategories({
       grade: categoryGrade({
         ...c,
         assignments: [...(c.assignments ?? []), { score: 0, max_score: 100 }],
-      }) * 100,
+      }, workingCourse.categories ?? []) * 100,
     }));
   };
 
@@ -207,7 +258,7 @@ export function CourseCategories({
       if (!assignments[assignIndex]) return c;
       assignments[assignIndex] = updater(assignments[assignIndex]);
       const nextCat: Category = { ...(c as Category), assignments };
-      return { ...nextCat, grade: categoryGrade(nextCat) * 100 };
+      return { ...nextCat, grade: categoryGrade(nextCat, workingCourse.categories ?? []) * 100 };
     });
   };
 
@@ -216,7 +267,7 @@ export function CourseCategories({
       const assignments = [...((c.assignments ?? []) as Assignment[])];
       assignments.splice(assignIndex, 1);
       const nextCat: Category = { ...(c as Category), assignments };
-      return { ...nextCat, grade: categoryGrade(nextCat) * 100 };
+      return { ...nextCat, grade: categoryGrade(nextCat, workingCourse.categories ?? []) * 100 };
     });
   };
 
@@ -263,22 +314,47 @@ export function CourseCategories({
   };
 
   const renderCategoryGrade = (cat: Category, idx: number) => {
-    const actual = categoryGrade(normalized.categories?.[idx] ?? cat);
-    const sim = whatIf && draftCourse ? categoryGrade(cat) : null;
-    const percent = (val: number) => `${(val * 100).toFixed(2)}%`;
-    if (sim === null) return percent(actual);
-    const diff = sim - actual;
-    const color =
-      diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-muted-foreground";
+    const actual = categoryGrade(normalized.categories?.[idx] ?? cat, normalized.categories ?? []);
+    const sim = whatIf && draftCourse ? categoryGrade(cat, draftCourse.categories ?? []) : null;
+    const percent = (val: number) => {
+      const num = val * 100;
+      // Remove .00 but keep other decimals like .50
+      return `${num.toFixed(2).replace(/\.00$/, '')}%`;
+    };
+    const weight = cat.weight;
+    const actualWeighted = actual * weight / 100;
+    const simWeighted = sim !== null ? sim * weight / 100 : null;
+    
+    if (sim === null) {
+      return (
+        <div className="flex flex-row items-center gap-2">
+          <span className="text-sm text-muted-foreground">{percent(actual)}</span>
+          <span>{percent(actualWeighted)}</span>
+        </div>
+      );
+    }
+    
+    const diff = simWeighted! - actualWeighted;
+    const color = diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-muted-foreground";
     return (
-      <div className="flex items-center gap-2">
-        <span>{percent(actual)}</span>
-        <span className={color}>{percent(sim)}</span>
+      <div className="flex flex-col items-end gap-0.5">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">{percent(actual)}</span>
+          <span className="text-sm text-muted-foreground">{percent(sim)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span>{percent(actualWeighted)}</span>
+          <span className={color}>{percent(simWeighted!)}</span>
+        </div>
       </div>
     );
   };
 
-  const percentLabel = (val: number) => `${(val * 100).toFixed(2)}%`;
+  const percentLabel = (val: number) => {
+    const num = val * 100;
+    // Remove .00 but keep other decimals like .50
+    return `${num.toFixed(2).replace(/\.00$/, '')}%`;
+  };
 
   return (
     <div className="container max-w-2xl  mx-auto py-12 px-6 flex flex-col gap-6">
@@ -323,6 +399,23 @@ export function CourseCategories({
           </p>
         </div>
       )}
+      {!normalized.manual && (() => {
+        const totalWeight = (normalized.categories ?? [])
+          .filter(cat => !cat.extra_credit)
+          .reduce((sum, cat) => sum + cat.weight, 0);
+        const weightsAddUp = Math.abs(totalWeight - 100) < 0.01; // Allow small floating point differences
+        if (!weightsAddUp) {
+          return (
+            <div className="p-4 rounded-lg bg-destructive/10">
+              <p className="text-sm text-destructive/75 flex flex-row gap-2 items-center">
+                <TriangleAlert className="size-4" />
+                Category weights do not add up to 100% (currently {totalWeight.toFixed(2)}%).
+              </p>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {!normalized.manual && (
         <Accordion type="multiple" className="w-full">
@@ -344,16 +437,44 @@ export function CourseCategories({
             <AccordionContent>
               {category.manual ? (
                 <div className="space-y-3">
-                  <Label className="text-sm">Manual grade (fraction)</Label>
+                  {/* <Label className="text-sm">Manual grade (fraction)</Label> */}
                   <div className="flex items-center gap-2">
                     <Input
-                      value={(category.grade / 100) * 100}
-                      onChange={(e) =>
+                      type="text"
+                      value={inputValues[`manual-grade-${catIndex}`] ?? String((category.grade / 100) * 100)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const key = `manual-grade-${catIndex}`;
+                        // Allow empty, numbers, and decimal point
+                        if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                          // Store the string value for display
+                          setInputValues(prev => ({ ...prev, [key]: value }));
+                          // Update the actual value if it's a complete number
+                          if (value !== "" && value !== "." && !value.endsWith(".")) {
+                            const numValue = Number(value);
+                            if (!isNaN(numValue)) {
+                              setCategory(catIndex, (c) => ({
+                                ...c,
+                                grade: numValue,
+                              }));
+                            }
+                          }
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        const key = `manual-grade-${catIndex}`;
+                        const numValue = value === "" || value === "." ? 0 : Number(value) || 0;
                         setCategory(catIndex, (c) => ({
                           ...c,
-                          grade: Number(e.target.value) || 0,
-                        }))
-                      }
+                          grade: numValue,
+                        }));
+                        setInputValues(prev => {
+                          const next = { ...prev };
+                          delete next[key];
+                          return next;
+                        });
+                      }}
                       className="w-24"
                       inputMode="decimal"
                       disabled={false}
@@ -364,18 +485,81 @@ export function CourseCategories({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={category.evenly_weighted}
-                      onCheckedChange={(v) =>
-                        setCategory(catIndex, (c) => ({
-                          ...c,
-                          evenly_weighted: v === true,
-                        }))
-                      }
-                    //   disabled={!whatIf}
-                    />
-                    <span className="text-sm">Assignments are evenly weighted</span>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={category.evenly_weighted}
+                        onCheckedChange={(v) =>
+                          setCategory(catIndex, (c) => ({
+                            ...c,
+                            evenly_weighted: v === true,
+                          }))
+                        }
+                      //   disabled={!whatIf}
+                      />
+                      <span className="text-sm">Evenly Weighted</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm whitespace-nowrap">Drop lowest:</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={category.drop_policy?.drop_count ?? 0}
+                        onChange={(e) => {
+                          const dropCount = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                          setCategory(catIndex, (c) => ({
+                            ...c,
+                            drop_policy: dropCount > 0
+                              ? {
+                                  drop_count: dropCount,
+                                  drop_with: c.drop_policy?.drop_with,
+                                }
+                              : undefined,
+                          }));
+                        }}
+                        className="w-16"
+                        inputMode="numeric"
+                      />
+                    </div>
+                    {(category.drop_policy?.drop_count ?? 0) > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm whitespace-nowrap">Replace with:</Label>
+                        <Select
+                          value={
+                            category.drop_policy?.drop_with === undefined
+                              ? "drop"
+                              : category.drop_policy.drop_with.toString()
+                          }
+                          onValueChange={(value) => {
+                            setCategory(catIndex, (c) => ({
+                              ...c,
+                              drop_policy: c.drop_policy
+                                ? {
+                                    ...c.drop_policy,
+                                    drop_with: value === "drop" ? undefined : Number(value),
+                                  }
+                                : undefined,
+                            }));
+                          }}
+                        >
+                          <SelectTrigger className="w-[200px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="drop">Dropped completely</SelectItem>
+                            {(workingCourse.categories ?? [])
+                              .map((cat, idx) => ({ cat, idx }))
+                              .filter(({ idx }) => idx !== catIndex)
+                              .map(({ cat, idx }) => (
+                                <SelectItem key={idx} value={idx.toString()}>
+                                  Replaced with {cat.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-3">
@@ -385,27 +569,82 @@ export function CourseCategories({
                         className="flex items-center gap-2 border border-border rounded-md px-3 py-2"
                       >
                         <Input
-                          value={assignment.score}
-                          onChange={(e) =>
+                          type="text"
+                          value={inputValues[`score-${catIndex}-${assignIndex}`] ?? String(assignment.score)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const key = `score-${catIndex}-${assignIndex}`;
+                            // Allow empty, numbers, and decimal point
+                            if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                              // Store the string value for display
+                              setInputValues(prev => ({ ...prev, [key]: value }));
+                              // Update the actual value if it's a complete number
+                              if (value !== "" && value !== "." && !value.endsWith(".")) {
+                                const numValue = Number(value);
+                                if (!isNaN(numValue)) {
+                                  updateAssignment(catIndex, assignIndex, (a) => ({
+                                    ...a,
+                                    score: numValue,
+                                  }));
+                                }
+                              }
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            const key = `score-${catIndex}-${assignIndex}`;
+                            // On blur, ensure we have a valid number and clear the input value cache
+                            const numValue = value === "" || value === "." ? 0 : Number(value) || 0;
                             updateAssignment(catIndex, assignIndex, (a) => ({
                               ...a,
-                              score: Number(e.target.value) || 0,
-                            }))
-                          }
-                        //   disabled={!whatIf}
+                              score: numValue,
+                            }));
+                            setInputValues(prev => {
+                              const next = { ...prev };
+                              delete next[key];
+                              return next;
+                            });
+                          }}
                           className="w-24"
                           inputMode="decimal"
                         />
                         <span>/</span>
                         <Input
-                          value={assignment.max_score}
-                          onChange={(e) =>
+                          type="text"
+                          value={inputValues[`max_score-${catIndex}-${assignIndex}`] ?? String(assignment.max_score)}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const key = `max_score-${catIndex}-${assignIndex}`;
+                            // Allow empty, numbers, and decimal point
+                            if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                              // Store the string value for display
+                              setInputValues(prev => ({ ...prev, [key]: value }));
+                              // Update the actual value if it's a complete number
+                              if (value !== "" && value !== "." && !value.endsWith(".")) {
+                                const numValue = Number(value);
+                                if (!isNaN(numValue)) {
+                                  updateAssignment(catIndex, assignIndex, (a) => ({
+                                    ...a,
+                                    max_score: Math.max(1, numValue),
+                                  }));
+                                }
+                              }
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value;
+                            const key = `max_score-${catIndex}-${assignIndex}`;
+                            const numValue = value === "" || value === "." ? 1 : Math.max(1, Number(value) || 1);
                             updateAssignment(catIndex, assignIndex, (a) => ({
                               ...a,
-                              max_score: Math.max(1, Number(e.target.value) || 0),
-                            }))
-                          }
-                        //   disabled={!whatIf}
+                              max_score: numValue,
+                            }));
+                            setInputValues(prev => {
+                              const next = { ...prev };
+                              delete next[key];
+                              return next;
+                            });
+                          }}
                           className="w-24"
                           inputMode="decimal"
                         />
@@ -447,13 +686,33 @@ export function CourseCategories({
           !whatIf ? (
             <div className="flex items-center gap-2">
               <Input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={workingCourse.grade.toFixed(2)}
+                type="text"
+                value={inputValues[`overall-grade-${courseIndex}`] ?? workingCourse.grade.toFixed(2)}
                 onChange={(e) => {
-                  const newGrade = Number(e.target.value) || 0;
+                  const value = e.target.value;
+                  const key = `overall-grade-${courseIndex}`;
+                  // Allow empty, numbers, and decimal point
+                  if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                    // Store the string value for display
+                    setInputValues(prev => ({ ...prev, [key]: value }));
+                    // Update the actual value if it's a complete number
+                    if (value !== "" && value !== "." && !value.endsWith(".")) {
+                      const newGrade = Number(value) || 0;
+                      if (newGrade >= 0 && newGrade <= 100) {
+                        const updatedCourse = { ...workingCourse, grade: newGrade };
+                        if (whatIf) {
+                          setDraftCourse(updatedCourse);
+                        } else {
+                          updateLocalAndPersist(updatedCourse);
+                        }
+                      }
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value;
+                  const key = `overall-grade-${courseIndex}`;
+                  const newGrade = value === "" || value === "." ? 0 : Number(value) || 0;
                   if (newGrade >= 0 && newGrade <= 100) {
                     const updatedCourse = { ...workingCourse, grade: newGrade };
                     if (whatIf) {
@@ -462,6 +721,11 @@ export function CourseCategories({
                       updateLocalAndPersist(updatedCourse);
                     }
                   }
+                  setInputValues(prev => {
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                  });
                 }}
                 className="w-24 text-xl font-semibold"
                 inputMode="decimal"
@@ -471,16 +735,36 @@ export function CourseCategories({
           ) : (
             <div className="flex items-center gap-2">
               <Input
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={workingCourse.grade.toFixed(2)}
+                type="text"
+                value={inputValues[`overall-grade-whatif-${courseIndex}`] ?? workingCourse.grade.toFixed(2)}
                 onChange={(e) => {
-                  const newGrade = Number(e.target.value) || 0;
+                  const value = e.target.value;
+                  const key = `overall-grade-whatif-${courseIndex}`;
+                  // Allow empty, numbers, and decimal point
+                  if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                    // Store the string value for display
+                    setInputValues(prev => ({ ...prev, [key]: value }));
+                    // Update the actual value if it's a complete number
+                    if (value !== "" && value !== "." && !value.endsWith(".")) {
+                      const newGrade = Number(value) || 0;
+                      if (newGrade >= 0 && newGrade <= 100) {
+                        setDraftCourse({ ...workingCourse, grade: newGrade });
+                      }
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  const value = e.target.value;
+                  const key = `overall-grade-whatif-${courseIndex}`;
+                  const newGrade = value === "" || value === "." ? 0 : Number(value) || 0;
                   if (newGrade >= 0 && newGrade <= 100) {
                     setDraftCourse({ ...workingCourse, grade: newGrade });
                   }
+                  setInputValues(prev => {
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                  });
                 }}
                 className="w-24 text-xl font-semibold"
                 inputMode="decimal"
