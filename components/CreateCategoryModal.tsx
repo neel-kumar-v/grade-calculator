@@ -36,6 +36,8 @@ export function CreateCategoryModal({
   const [manual, setManual] = useState(false);
   const [evenlyWeighted, setEvenlyWeighted] = useState(true);
   const [manualScore, setManualScore] = useState<number>(100);
+  const [manualScoreInput, setManualScoreInput] = useState<string>("");
+  const [dropCount, setDropCount] = useState<number>(0);
 
   const reset = () => {
     setName("");
@@ -44,6 +46,8 @@ export function CreateCategoryModal({
     setManual(false);
     setEvenlyWeighted(true);
     setManualScore(100);
+    setManualScoreInput("");
+    setDropCount(0);
   };
 
   const handleClose = () => {
@@ -65,6 +69,12 @@ export function CreateCategoryModal({
       extra_credit: extraCredit,
       manual,
       grade: gradeValue,
+      drop_policy: dropCount > 0
+        ? {
+            drop_count: dropCount,
+            drop_with: undefined, // Will be set later when editing if needed
+          }
+        : undefined,
       // for manual categories we omit assignments; for auto we seed with one assignment
       ...(manual
         ? {}
@@ -139,31 +149,67 @@ export function CreateCategoryModal({
               <Label>Category grade</Label>
               <div className="flex items-center gap-2">
                 <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={manualScore}
+                  type="text"
+                  value={manualScoreInput || String(manualScore)}
                   onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (Number.isNaN(v)) {
-                      setManualScore(0);
-                    } else {
-                      setManualScore(Math.max(0, Math.min(100, v)));
+                    const value = e.target.value;
+                    // Allow empty, numbers, and decimal point
+                    if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                      // Store the string value for display
+                      setManualScoreInput(value);
+                      // Update the actual value if it's a complete number
+                      if (value !== "" && value !== "." && !value.endsWith(".")) {
+                        const numValue = Number(value);
+                        if (!isNaN(numValue) && numValue >= 0) {
+                          setManualScore(numValue);
+                        }
+                      }
                     }
                   }}
+                  onBlur={(e) => {
+                    const value = e.target.value;
+                    const numValue = value === "" || value === "." ? 0 : Number(value) || 0;
+                    if (numValue >= 0) {
+                      setManualScore(numValue);
+                    }
+                    setManualScoreInput("");
+                  }}
                   className="w-20"
+                  inputMode="decimal"
                 />
                 <span>/</span>
                 <Input value={100} readOnly className="w-20 bg-muted" />
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={evenlyWeighted}
-                onCheckedChange={(v) => setEvenlyWeighted(v === true)}
-              />
-              <span className="text-sm">Assignments are evenly weighted</span>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={evenlyWeighted}
+                  onCheckedChange={(v) => setEvenlyWeighted(v === true)}
+                />
+                <span className="text-sm">Assignments are evenly weighted</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm whitespace-nowrap">Drop lowest:</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={dropCount}
+                  onChange={(e) => {
+                    const value = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                    setDropCount(value);
+                  }}
+                  className="w-16"
+                  inputMode="numeric"
+                />
+                {dropCount > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    (Will drop completely; can change replacement policy when editing)
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
