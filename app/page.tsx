@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import {
   Authenticated,
   AuthLoading,
@@ -9,10 +8,9 @@ import {
 } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { SignIn } from "../components/auth/SignIn";
-import { SignOut } from "../components/auth/SignOut";
 import GradingPeriods from "../components/GradingPeriods";
 import type { Doc } from "../convex/_generated/dataModel";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, type ReactNode } from "react";
 
 // Convert percentage (0-100) to GPA (0-4.0) using standard 4.0 scale
 function percentageToGPA(percentage: number): number {
@@ -124,8 +122,39 @@ function calculateOverallCoreGPA(gradingPeriods: Doc<"gradingPeriods">[]): numbe
   return totalWeightedCoreGPA / totalCoreCredits;
 }
 
+function AuthWrapper({ 
+  setIsAuthenticated, 
+  children 
+}: { 
+  setIsAuthenticated: (value: boolean) => void; 
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    setIsAuthenticated(true);
+  }, [setIsAuthenticated]);
+  return <>{children}</>;
+}
+
+function UnauthWrapper({ 
+  setIsAuthenticated, 
+  children 
+}: { 
+  setIsAuthenticated: (value: boolean) => void; 
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    setIsAuthenticated(false);
+  }, [setIsAuthenticated]);
+  return <>{children}</>;
+}
+
 export default function Home() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const gradingPeriods = useQuery(api.gradingPeriods.get);
+
+  useEffect(() => {
+    document.title = "Heavyweight";
+  }, []);
 
   const overallGPA = useMemo(() => {
     if (!gradingPeriods || gradingPeriods.length === 0) return null;
@@ -143,37 +172,41 @@ export default function Home() {
   }, [gradingPeriods]);
 
   return (
-    <main className="flex min-h-screen container max-w-3xl  mx-auto flex-col items-start justify-start px-6 py-12 bg-background">
+    <main className={`flex min-h-[90vh] container max-w-3xl  mx-auto flex-col px-6 py-12 bg-background ${isAuthenticated ? 'items-start justify-start' : 'items-center justify-center'}`}>
       <AuthLoading>Loading... </AuthLoading>
       <Unauthenticated>
-        <SignIn />
+        <UnauthWrapper setIsAuthenticated={setIsAuthenticated}>
+          <SignIn />
+        </UnauthWrapper>
       </Unauthenticated>
       <Authenticated>
-        {gradingPeriods && gradingPeriods.length > 0 && (overallGPA !== null || overallCoreGPA !== null) && (
-          <div className="w-full mb-8 p-6 rounded-lg bg-card">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold">Overall GPA</h2>
-                <p className="text-sm text-muted-foreground">
-                  {totalCredits} total credit{totalCredits !== 1 ? "s" : ""}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-px">
-                {overallGPA !== null && (
-                  <div className="text-2xl font-bold">
-                    {overallGPA.toFixed(2)}
-                  </div>
-                )}
-                {overallCoreGPA !== null && (
-                  <div className="text-sm text-muted-foreground">
-                    {overallCoreGPA.toFixed(2)}
-                  </div>
-                )}
+        <AuthWrapper setIsAuthenticated={setIsAuthenticated}>
+          {gradingPeriods && gradingPeriods.length > 0 && (overallGPA !== null || overallCoreGPA !== null) && (
+            <div className="w-full mb-8 p-6 rounded-lg bg-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Overall GPA</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {totalCredits} total credit{totalCredits !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-px">
+                  {overallGPA !== null && (
+                    <div className="text-2xl font-bold">
+                      {overallGPA.toFixed(2)}
+                    </div>
+                  )}
+                  {overallCoreGPA !== null && (
+                    <div className="text-sm text-muted-foreground">
+                      {overallCoreGPA.toFixed(2)}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        <GradingPeriods gradingPeriods={gradingPeriods ?? undefined} />
+          )}
+          <GradingPeriods gradingPeriods={gradingPeriods ?? undefined} />
+        </AuthWrapper>
       </Authenticated>
     </main>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -29,6 +29,16 @@ export default function CoursePage({ params }: PageProps) {
     gradingPeriodId: gradingPeriodIdTyped,
     courseIndex: index,
   });
+
+  const gradingPeriod = useQuery(api.gradingPeriods.getById, {
+    id: gradingPeriodIdTyped,
+  });
+
+  useEffect(() => {
+    if (data?.course && gradingPeriod) {
+      document.title = `${data.course.name} (${gradingPeriod.name}) - Heavyweight`;
+    }
+  }, [data, gradingPeriod]);
 
   if (data === undefined) {
     return (

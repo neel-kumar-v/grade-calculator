@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -19,6 +19,12 @@ export default function GradingPeriodPage({ params }: PageProps) {
   const gradingPeriod = useQuery(api.gradingPeriods.getById, {
     id: gradingPeriodIdTyped,
   });
+
+  useEffect(() => {
+    if (gradingPeriod) {
+      document.title = `${gradingPeriod.name} - Heavyweight`;
+    }
+  }, [gradingPeriod]);
 
   if (gradingPeriod === undefined) {
     return (
