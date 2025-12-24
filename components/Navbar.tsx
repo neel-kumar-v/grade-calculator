@@ -64,11 +64,13 @@ function useNavContext(): NavContext {
 }
 
 function SemesterNavItem({
+  depth,
   gradingPeriodId,
   gradingPeriods,
   currentGradingPeriod,
 }: {
-  gradingPeriodId: string;
+  depth: number;
+  gradingPeriodId: string | null;
   gradingPeriods:
     | ReturnType<typeof useQuery<typeof api.gradingPeriods.get>>
     | undefined;
@@ -76,9 +78,40 @@ function SemesterNavItem({
     | ReturnType<typeof useQuery<typeof api.gradingPeriods.getById>>
     | undefined;
 }) {
-  if (!gradingPeriodId) return null;
+  const hasList = Array.isArray(gradingPeriods) && gradingPeriods.length > 0;
+  const isRootPage = depth === 0;
+  
+  // On root page, show "Semesters" without a link
+  if (isRootPage) {
+    return (
+      <NavigationMenuItem>
+        <NavigationMenuTrigger className="font-medium">
+          <span className="flex items-center gap-1">Semesters</span>
+        </NavigationMenuTrigger>
+        {hasList && (
+          <NavigationMenuContent>
+            <ul className="flex flex-col w-full gap-1">
+              {gradingPeriods!.map((period) => (
+                <li key={period._id}>
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href={`/${period._id}`}
+                      className="flex items-center justify-between"
+                    >
+                      <span>{period.name}</span>
+                    </Link>
+                  </NavigationMenuLink>
+                </li>
+              ))}
+            </ul>
+          </NavigationMenuContent>
+        )}
+      </NavigationMenuItem>
+    );
+  }
 
-  if (currentGradingPeriod === null) {
+  // On semester page, show semester name with link
+  if (!gradingPeriodId || currentGradingPeriod === null) {
     return null;
   }
 
@@ -86,8 +119,6 @@ function SemesterNavItem({
     currentGradingPeriod && currentGradingPeriod !== undefined
       ? currentGradingPeriod.name
       : "Loading semester...";
-
-  const hasList = Array.isArray(gradingPeriods) && gradingPeriods.length > 0;
 
   return (
     <NavigationMenuItem>
@@ -119,12 +150,14 @@ function SemesterNavItem({
 }
 
 function CourseNavItem({
+  depth,
   gradingPeriodId,
   courseIndex,
   currentGradingPeriod,
 }: {
-  gradingPeriodId: string;
-  courseIndex: number;
+  depth: number;
+  gradingPeriodId: string | null;
+  courseIndex: number | null;
   currentGradingPeriod:
     | ReturnType<typeof useQuery<typeof api.gradingPeriods.getById>>
     | undefined;
@@ -132,8 +165,42 @@ function CourseNavItem({
   if (!gradingPeriodId || currentGradingPeriod === null) return null;
 
   const courses = currentGradingPeriod?.courses ?? [];
+  const hasList = Array.isArray(courses) && courses.length > 0;
+  const isSemesterPage = depth === 1;
 
-  if (!Number.isFinite(courseIndex) || courseIndex < 0) {
+  // On semester page, show "Courses" without a link
+  if (isSemesterPage) {
+    return (
+      <NavigationMenuItem>
+        <NavigationMenuTrigger className="font-medium">
+          <span className="flex items-center gap-1">Courses</span>
+        </NavigationMenuTrigger>
+        {hasList && (
+          <NavigationMenuContent>
+            <ul className="flex flex-col w-full gap-1">
+              {courses.map((course, index) => (
+                <li key={index}>
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href={`/${gradingPeriodId}/${index}`}
+                      className="flex items-center justify-between"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{course.name}</span>
+                      </div>
+                    </Link>
+                  </NavigationMenuLink>
+                </li>
+              ))}
+            </ul>
+          </NavigationMenuContent>
+        )}
+      </NavigationMenuItem>
+    );
+  }
+
+  // On course page, show course name with link
+  if (courseIndex === null || !Number.isFinite(courseIndex) || courseIndex < 0) {
     return null;
   }
 
@@ -143,8 +210,6 @@ function CourseNavItem({
 
   const currentCourse = courses[courseIndex];
   const label = currentCourse ? currentCourse.name : "Course";
-
-  const hasList = Array.isArray(courses) && courses.length > 0;
 
   return (
     <NavigationMenuItem>
@@ -189,11 +254,9 @@ export function Navbar() {
     currentGradingPeriod,
   } = useNavContext();
 
-  const showSemester = depth >= 1 && gradingPeriodId;
   const showCourse =
-    depth >= 2 &&
+    depth >= 1 &&
     gradingPeriodId &&
-    courseIndex !== null &&
     currentGradingPeriod &&
     currentGradingPeriod !== undefined &&
     currentGradingPeriod !== null;
@@ -215,24 +278,21 @@ export function Navbar() {
               </NavigationMenuLink>
             </NavigationMenuItem>
 
-            {showSemester && gradingPeriodId && (
-              <SemesterNavItem
+            <SemesterNavItem
+              depth={depth}
+              gradingPeriodId={gradingPeriodId}
+              gradingPeriods={gradingPeriods}
+              currentGradingPeriod={currentGradingPeriod}
+            />
+
+            {showCourse && (
+              <CourseNavItem
+                depth={depth}
                 gradingPeriodId={gradingPeriodId}
-                gradingPeriods={gradingPeriods}
+                courseIndex={courseIndex}
                 currentGradingPeriod={currentGradingPeriod}
               />
             )}
-
-            {showCourse &&
-              gradingPeriodId &&
-              courseIndex !== null &&
-              typeof courseIndex === "number" && (
-                <CourseNavItem
-                  gradingPeriodId={gradingPeriodId}
-                  courseIndex={courseIndex}
-                  currentGradingPeriod={currentGradingPeriod}
-                />
-              )}
           </NavigationMenuList>
         </NavigationMenu>
 
