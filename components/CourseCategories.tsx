@@ -79,44 +79,43 @@ function categoryGrade(category: Category, allCategories?: Category[]): number {
   if (!assignments.length) return 0;
 
   // Apply drop policy if configured
-  if (category.drop_policy && category.drop_policy.drop_count > 0) {
+  try {
+    if (!category.drop_policy) throw new Error();
     const dropCount = category.drop_policy.drop_count;
-    if (dropCount > 0 && assignments.length > dropCount) {
-      // Create array with indices to track original positions
-      const withIndices = assignments.map((a, idx) => ({ assignment: a, index: idx }));
-      // Sort by percentage (lowest first)
-      withIndices.sort((a, b) => {
-        const percentA = assignmentPercent(a.assignment);
-        const percentB = assignmentPercent(b.assignment);
-        return percentA - percentB;
+    if (dropCount <= 0 || assignments.length <= dropCount) throw new Error();
+    
+    const withIndices = assignments.map((a, idx) => ({ 
+      assignment: a, 
+      index: idx 
+    }));
+    withIndices.sort((a, b) => {
+      const percentA = assignmentPercent(a.assignment);
+      const percentB = assignmentPercent(b.assignment);
+      return percentA - percentB;
+    });
+
+    // Get the lowest N assignment indices to drop/replace
+    const toDropIndices = new Set(withIndices.slice(0, dropCount).map(item => item.index));
+
+    if (category.drop_policy.drop_with === undefined) assignments = assignments.filter((_, idx) => !toDropIndices.has(idx));
+    else {
+      const replaceCategoryIndex = category.drop_policy.drop_with;
+      if (!allCategories || !allCategories[replaceCategoryIndex]) throw new Error();
+
+      const replaceCategory = allCategories[replaceCategoryIndex];
+      const replaceGrade = categoryGrade(replaceCategory, allCategories);
+
+
+      assignments = assignments.map((assignment, idx) => {
+        if (!toDropIndices.has(idx)) return assignment;
+        return {
+          score: replaceGrade * assignment.max_score,
+          max_score: assignment.max_score,
+        };
       });
-
-      // Get the lowest N assignment indices to drop/replace
-      const toDropIndices = new Set(withIndices.slice(0, dropCount).map(item => item.index));
-
-      if (category.drop_policy.drop_with === undefined) {
-        // Drop completely: remove them from the assignments array
-        assignments = assignments.filter((_, idx) => !toDropIndices.has(idx));
-      } else {
-        // Replace with grade from another category
-        const replaceCategoryIndex = category.drop_policy.drop_with;
-        if (allCategories && allCategories[replaceCategoryIndex]) {
-          const replaceCategory = allCategories[replaceCategoryIndex];
-          const replaceGrade = categoryGrade(replaceCategory, allCategories);
-          // Replace the lowest assignments with the grade from the other category
-          // We'll represent this by adjusting the scores to match the replacement grade
-          assignments = assignments.map((assignment, idx) => {
-            if (toDropIndices.has(idx)) {
-              return {
-                score: replaceGrade * assignment.max_score,
-                max_score: assignment.max_score,
-              };
-            }
-            return assignment;
-          });
-        }
-      }
     }
+  } catch {
+    // Skip drop policy processing used as a continue
   }
 
   if (category.evenly_weighted) {
