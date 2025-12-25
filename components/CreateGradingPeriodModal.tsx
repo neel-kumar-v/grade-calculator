@@ -19,6 +19,7 @@ import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { HelpCircle } from "lucide-react";
+import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 
 interface CreateGradingPeriodModalProps {
   open: boolean;
@@ -31,6 +32,7 @@ export function CreateGradingPeriodModal({
 }: CreateGradingPeriodModalProps) {
   const router = useRouter();
   const createGradingPeriod = useMutation(api.gradingPeriods.create);
+  const gradingPeriodName = useGradingPeriodName();
   const [name, setName] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,9 +69,9 @@ export function CreateGradingPeriodModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create Grading Period</DialogTitle>
+          <DialogTitle>Create {gradingPeriodName.slice(0, -1)}</DialogTitle>
           <DialogDescription>
-            Create a new grading period to track your courses and grades.
+            Create a new {gradingPeriodName.toLowerCase().slice(0, -1)} to track your courses and grades.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -104,7 +106,7 @@ export function CreateGradingPeriodModal({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>
-                      Check this if this grading period has already ended and
+                      Check this if this {gradingPeriodName.toLowerCase().slice(0, -1)} has already ended and
                       you're entering historical grades.
                     </p>
                   </TooltipContent>

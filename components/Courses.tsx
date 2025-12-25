@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { BookOpen, Plus, Trash, Check } from "lucide-react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -17,28 +17,12 @@ import {
 } from "./ui/context-menu";
 import { CreateCourseModal } from "./CreateCourseModal";
 import type { Doc, Id } from "../convex/_generated/dataModel";
-import { percentageToGPA } from "./GradingPeriods";
+import { getScaleByName, calculateGPA, convertGradeToLetter, SCALE_NAMES } from "../lib/gpa";
+import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
+
 interface CoursesProps {
   gradingPeriodId: Id<"gradingPeriods">;
   gradingPeriod: Doc<"gradingPeriods">;
-}
-
-function convertGradeToLetter(grade: number): string {
-  switch (true) {
-    case grade >= 97: return "A+";
-    case grade >= 93: return "A";
-    case grade >= 90: return "A-";
-    case grade >= 87: return "B+";
-    case grade >= 83: return "B";
-    case grade >= 80: return "B-";
-    case grade >= 77: return "C+";
-    case grade >= 73: return "C";
-    case grade >= 70: return "C-";
-    case grade >= 67: return "D+";
-    case grade >= 65: return "D";
-    case grade >= 63: return "D-";
-    default: return "F";
-  }
 }
 
 // Calculate total credits for a grading period
@@ -52,6 +36,17 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   const updateCourse = useMutation(api.gradingPeriods.updateCourse);
   const updateGrades = useMutation(api.gradingPeriods.updateGrades);
   const removeCourse = useMutation(api.gradingPeriods.removeCourse);
+  const settings = useQuery(api.settings.get);
+  const gradingPeriodName = useGradingPeriodName();
+
+  const scale = useMemo(() => {
+    if (!settings || !("gpaScale" in settings)) return getScaleByName("STANDARD_4_0");
+    const settingsDoc = settings as any;
+    return getScaleByName(settingsDoc.gpaScale, settingsDoc.customScale);
+  }, [settings]);
+
+  const isWAM = scale === "WAM";
+  const gpaLabel = isWAM ? "WAM" : "GPA";
 
   const hasCourses = gradingPeriod.courses.length > 0;
   const totalCredits = calculateTotalCredits(gradingPeriod);
@@ -71,30 +66,30 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   }, [needsGPACalculation, gradingPeriodId, updateGrades]);
 
   // Calculate GPA from courses directly to ensure accuracy (don't trust stored value)
-  let semesterGPA: number | null = null;
+  let periodGPA: number | null = null;
   let totalWeightedGPA = 0;
   let totalCreditsForGPA = 0;
   for (const course of gradingPeriod.courses) {
     if (typeof course.grade === "number" && course.grade > 0) {
-      const courseGPA = percentageToGPA(course.grade);
+      const courseGPA = calculateGPA(course.grade, scale);
       totalWeightedGPA += courseGPA * course.credits;
       totalCreditsForGPA += course.credits;
     }
   }
-  semesterGPA = totalCreditsForGPA > 0 ? totalWeightedGPA / totalCreditsForGPA : null;
+  periodGPA = totalCreditsForGPA > 0 ? totalWeightedGPA / totalCreditsForGPA : null;
 
   // Calculate core GPA from courses directly
-  let semesterCoreGPA: number | null = null;
+  let periodCoreGPA: number | null = null;
   let totalWeightedCoreGPA = 0;
   let totalCoreCredits = 0;
   for (const course of gradingPeriod.courses) {
     if (course.part_of_degree && typeof course.grade === "number" && course.grade > 0) {
-      const courseGPA = percentageToGPA(course.grade);
+      const courseGPA = calculateGPA(course.grade, scale);
       totalWeightedCoreGPA += courseGPA * course.credits;
       totalCoreCredits += course.credits;
     }
   }
-  semesterCoreGPA = totalCoreCredits > 0 ? totalWeightedCoreGPA / totalCoreCredits : null;
+  periodCoreGPA = totalCoreCredits > 0 ? totalWeightedCoreGPA / totalCoreCredits : null;
 
   const handleGradeChange = (index: number, value: string) => {
     setGradeValues(prev => ({ ...prev, [index]: value }));
@@ -145,21 +140,21 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
         </Button>
       </div>
 
-      {hasCourses && semesterGPA !== null && (
+      {hasCourses && periodGPA !== null && (
         <div className="p-3 pr-6 border border-border rounded-lg bg-card">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Semester GPA</h2>
+              <h2 className="text-xl font-semibold">{gradingPeriodName.slice(0, -1)} {gpaLabel}</h2>
               <p className="text-sm text-muted-foreground">
                 {totalCredits} credit{totalCredits !== 1 ? "s" : ""}
               </p>
             </div>
             <div className="flex flex-col items-end  gap-2">
               <div className="text-xl font-bold">
-                {semesterGPA.toFixed(2)}
+                {isWAM ? periodGPA.toFixed(2) + "%" : periodGPA.toFixed(2)}
               </div>
               <div className="text-sm text-muted-foreground">
-                {semesterCoreGPA !== null ? semesterCoreGPA.toFixed(2) : "N/A"}
+                {periodCoreGPA !== null ? (isWAM ? periodCoreGPA.toFixed(2) + "%" : periodCoreGPA.toFixed(2)) : "N/A"}
               </div>
             </div>
           </div>
@@ -171,7 +166,7 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
           <BookOpen className="size-16 text-muted-foreground" />
           <h2 className="text-3xl font-semibold">No courses yet</h2>
           <p className="text-muted-foreground text-center max-w-md">
-            Get started by adding your first course to this grading period.
+            Get started by adding your first course to this {gradingPeriodName.toLowerCase().slice(0, -1)}.
           </p>
           <Button onClick={() => setIsCourseModalOpen(true)} size="lg">
             Add Course

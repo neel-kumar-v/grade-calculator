@@ -11,21 +11,7 @@ import { SignIn } from "../components/auth/SignIn";
 import GradingPeriods from "../components/GradingPeriods";
 import type { Doc } from "../convex/_generated/dataModel";
 import { useMemo, useState, useEffect, type ReactNode } from "react";
-
-// Convert percentage (0-100) to GPA (0-4.0) using standard 4.0 scale
-function percentageToGPA(percentage: number): number {
-  if (percentage >= 93) return 4.0;
-  if (percentage >= 90) return 3.7;
-  if (percentage >= 87) return 3.3;
-  if (percentage >= 83) return 3.0;
-  if (percentage >= 80) return 2.7;
-  if (percentage >= 77) return 2.3;
-  if (percentage >= 73) return 2.0;
-  if (percentage >= 70) return 1.7;
-  if (percentage >= 67) return 1.3;
-  if (percentage >= 65) return 1.0;
-  return 0.0;
-}
+import { getScaleByName, calculateGPA } from "../lib/gpa";
 
 // Calculate total credits for a grading period
 function calculateTotalCredits(gradingPeriod: Doc<"gradingPeriods">): number {
@@ -33,14 +19,14 @@ function calculateTotalCredits(gradingPeriod: Doc<"gradingPeriods">): number {
 }
 
 // Calculate GPA for a grading period (always calculate from courses for accuracy)
-function getGradingPeriodGPA(gradingPeriod: Doc<"gradingPeriods">): number | null {
+function getGradingPeriodGPA(gradingPeriod: Doc<"gradingPeriods">, scale: ReturnType<typeof getScaleByName>): number | null {
   // Always calculate from courses to ensure accuracy, don't trust stored value
   let totalWeightedGPA = 0;
   let totalCredits = 0;
   
   for (const course of gradingPeriod.courses) {
     if (typeof course.grade === "number" && course.grade > 0) {
-      const courseGPA = percentageToGPA(course.grade);
+      const courseGPA = calculateGPA(course.grade, scale);
       totalWeightedGPA += courseGPA * course.credits;
       totalCredits += course.credits;
     }
@@ -51,7 +37,7 @@ function getGradingPeriodGPA(gradingPeriod: Doc<"gradingPeriods">): number | nul
 }
 
 // Calculate core GPA for a grading period (always calculate from courses for accuracy)
-function getGradingPeriodCoreGPA(gradingPeriod: Doc<"gradingPeriods">): number | null {
+function getGradingPeriodCoreGPA(gradingPeriod: Doc<"gradingPeriods">, scale: ReturnType<typeof getScaleByName>): number | null {
   // Always calculate from core courses to ensure accuracy
   const coreCourses = gradingPeriod.courses.filter(course => course.part_of_degree);
   
@@ -60,7 +46,7 @@ function getGradingPeriodCoreGPA(gradingPeriod: Doc<"gradingPeriods">): number |
   
   for (const course of coreCourses) {
     if (typeof course.grade === "number" && course.grade > 0) {
-      const courseGPA = percentageToGPA(course.grade);
+      const courseGPA = calculateGPA(course.grade, scale);
       totalWeightedGPA += courseGPA * course.credits;
       totalCredits += course.credits;
     }
@@ -70,11 +56,11 @@ function getGradingPeriodCoreGPA(gradingPeriod: Doc<"gradingPeriods">): number |
   return totalWeightedGPA / totalCredits;
 }
 
-// Calculate overall weighted GPA across all grading periods using stored semester GPAs
-function calculateOverallGPA(gradingPeriods: Doc<"gradingPeriods">[]): number | null {
+// Calculate overall weighted GPA across all grading periods using stored grading period GPAs
+function calculateOverallGPA(gradingPeriods: Doc<"gradingPeriods">[], scale: ReturnType<typeof getScaleByName>): number | null {
   // If there's only one grading period, return its GPA directly
   if (gradingPeriods.length === 1) {
-    return getGradingPeriodGPA(gradingPeriods[0]);
+    return getGradingPeriodGPA(gradingPeriods[0], scale);
   }
   
   let totalWeightedGPA = 0;
@@ -82,7 +68,7 @@ function calculateOverallGPA(gradingPeriods: Doc<"gradingPeriods">[]): number | 
 
   for (const gradingPeriod of gradingPeriods) {
     const periodCredits = calculateTotalCredits(gradingPeriod);
-    const periodGPA = getGradingPeriodGPA(gradingPeriod);
+    const periodGPA = getGradingPeriodGPA(gradingPeriod, scale);
     
     if (periodCredits > 0 && periodGPA !== null) {
       totalWeightedGPA += periodGPA * periodCredits;
@@ -95,10 +81,10 @@ function calculateOverallGPA(gradingPeriods: Doc<"gradingPeriods">[]): number | 
 }
 
 // Calculate overall weighted core GPA across all grading periods using stored core GPAs
-function calculateOverallCoreGPA(gradingPeriods: Doc<"gradingPeriods">[]): number | null {
+function calculateOverallCoreGPA(gradingPeriods: Doc<"gradingPeriods">[], scale: ReturnType<typeof getScaleByName>): number | null {
   // If there's only one grading period, return its core GPA directly
   if (gradingPeriods.length === 1) {
-    return getGradingPeriodCoreGPA(gradingPeriods[0]);
+    return getGradingPeriodCoreGPA(gradingPeriods[0], scale);
   }
   
   let totalWeightedCoreGPA = 0;
@@ -110,7 +96,7 @@ function calculateOverallCoreGPA(gradingPeriods: Doc<"gradingPeriods">[]): numbe
       .filter(course => course.part_of_degree)
       .reduce((sum, course) => sum + course.credits, 0);
     
-    const periodCoreGPA = getGradingPeriodCoreGPA(gradingPeriod);
+    const periodCoreGPA = getGradingPeriodCoreGPA(gradingPeriod, scale);
     
     if (coreCredits > 0 && periodCoreGPA !== null) {
       totalWeightedCoreGPA += periodCoreGPA * coreCredits;
@@ -151,6 +137,15 @@ function UnauthWrapper({
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const gradingPeriods = useQuery(api.gradingPeriods.get);
+  const settings = useQuery(api.settings.get);
+
+  const scale = useMemo(() => {
+    if (!settings) return getScaleByName("STANDARD_4_0");
+    return getScaleByName(settings.gpaScale, settings.customScale);
+  }, [settings]);
+
+  const isWAM = scale === "WAM";
+  const gpaLabel = isWAM ? "WAM" : "GPA";
 
   useEffect(() => {
     document.title = "Heavyweight";
@@ -158,13 +153,13 @@ export default function Home() {
 
   const overallGPA = useMemo(() => {
     if (!gradingPeriods || gradingPeriods.length === 0) return null;
-    return calculateOverallGPA(gradingPeriods);
-  }, [gradingPeriods]);
+    return calculateOverallGPA(gradingPeriods, scale);
+  }, [gradingPeriods, scale]);
 
   const overallCoreGPA = useMemo(() => {
     if (!gradingPeriods || gradingPeriods.length === 0) return null;
-    return calculateOverallCoreGPA(gradingPeriods);
-  }, [gradingPeriods]);
+    return calculateOverallCoreGPA(gradingPeriods, scale);
+  }, [gradingPeriods, scale]);
 
   const totalCredits = useMemo(() => {
     if (!gradingPeriods) return 0;
@@ -185,7 +180,7 @@ export default function Home() {
             <div className="w-full mb-8 p-6 rounded-lg bg-card">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold">Overall GPA</h2>
+                  <h2 className="text-xl font-semibold">Overall {gpaLabel}</h2>
                   <p className="text-sm text-muted-foreground">
                     {totalCredits} total credit{totalCredits !== 1 ? "s" : ""}
                   </p>
@@ -193,12 +188,12 @@ export default function Home() {
                 <div className="flex flex-col items-end gap-px">
                   {overallGPA !== null && (
                     <div className="text-2xl font-bold">
-                      {overallGPA.toFixed(2)}
+                      {isWAM ? overallGPA.toFixed(2) + "%" : overallGPA.toFixed(2)}
                     </div>
                   )}
                   {overallCoreGPA !== null && (
                     <div className="text-sm text-muted-foreground">
-                      {overallCoreGPA.toFixed(2)}
+                      {isWAM ? overallCoreGPA.toFixed(2) + "%" : overallCoreGPA.toFixed(2)}
                     </div>
                   )}
                 </div>
