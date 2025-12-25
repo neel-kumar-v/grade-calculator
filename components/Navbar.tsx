@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Authenticated, Unauthenticated, useQuery } from "convex/react";
-import { Scale } from "lucide-react";
+import { Scale, Weight } from "lucide-react";
 import { api } from "../convex/_generated/api";
 import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 import type { Id } from "../convex/_generated/dataModel";
@@ -276,11 +276,13 @@ export function Navbar() {
             <NavigationMenuItem>
               <NavigationMenuLink
                 asChild
-                className="flex flex-row items-center gap-2 font-semibold"
+                className="hover:bg-transparent focus:bg-transparent flex flex-row items-center gap-2 font-semibold"
               >
-                <Link href="/">
-                  <Scale className="size-7" />
-                  {/* <span>Weighted</span> */}
+                <Link href="/" className="relative">
+                  <Weight className="size-10 stroke-1 text-black dark:text-white" />
+                  <span className="absolute inset-0 top-1.5 flex items-center justify-center text-text font-bold text-[1em] leading-none">
+                    A<sup className="text-[0.8em] -translate-x-0.5 leading-none">+</sup>
+                  </span>
                 </Link>
               </NavigationMenuLink>
             </NavigationMenuItem>
