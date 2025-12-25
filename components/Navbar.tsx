@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Authenticated, Unauthenticated, useQuery } from "convex/react";
 import { Scale } from "lucide-react";
 import { api } from "../convex/_generated/api";
+import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 import type { Id } from "../convex/_generated/dataModel";
 import {
   NavigationMenu,
@@ -17,6 +18,9 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 import { SignOut } from "./auth/SignOut";
 import { Button } from "./ui/button";
+import { Settings } from "lucide-react";
+import { SettingsModal } from "./SettingsModal";
+import { useState } from "react";
 
 interface NavContext {
   depth: number;
@@ -63,7 +67,7 @@ function useNavContext(): NavContext {
   };
 }
 
-function SemesterNavItem({
+function GradingPeriodNavItem({
   depth,
   gradingPeriodId,
   gradingPeriods,
@@ -78,15 +82,16 @@ function SemesterNavItem({
     | ReturnType<typeof useQuery<typeof api.gradingPeriods.getById>>
     | undefined;
 }) {
+  const gradingPeriodName = useGradingPeriodName();
   const hasList = Array.isArray(gradingPeriods) && gradingPeriods.length > 0;
   const isRootPage = depth === 0;
   
-  // On root page, show "Semesters" without a link
+  // On root page, show grading period name without a link
   if (isRootPage) {
     return (
       <NavigationMenuItem>
         <NavigationMenuTrigger className="font-medium">
-          <span className="flex items-center gap-1">Semesters</span>
+          <span className="flex items-center gap-1">{gradingPeriodName}</span>
         </NavigationMenuTrigger>
         {hasList && (
           <NavigationMenuContent>
@@ -110,15 +115,15 @@ function SemesterNavItem({
     );
   }
 
-  // On semester page, show semester name with link
+  // On grading period page, show grading period name with link
   if (!gradingPeriodId || currentGradingPeriod === null) {
     return null;
   }
-
+  
   const label =
     currentGradingPeriod && currentGradingPeriod !== undefined
       ? currentGradingPeriod.name
-      : "Loading semester...";
+      : `Loading ${gradingPeriodName.toLowerCase().slice(0, -1)}...`;
 
   return (
     <NavigationMenuItem>
@@ -166,10 +171,10 @@ function CourseNavItem({
 
   const courses = currentGradingPeriod?.courses ?? [];
   const hasList = Array.isArray(courses) && courses.length > 0;
-  const isSemesterPage = depth === 1;
+  const isGradingPeriodPage = depth === 1;
 
-  // On semester page, show "Courses" without a link
-  if (isSemesterPage) {
+  // On grading period page, show "Courses" without a link
+  if (isGradingPeriodPage) {
     return (
       <NavigationMenuItem>
         <NavigationMenuTrigger className="font-medium">
@@ -254,6 +259,8 @@ export function Navbar() {
     currentGradingPeriod,
   } = useNavContext();
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const showCourse =
     depth >= 1 &&
     gradingPeriodId &&
@@ -278,7 +285,7 @@ export function Navbar() {
               </NavigationMenuLink>
             </NavigationMenuItem>
 
-            <SemesterNavItem
+            <GradingPeriodNavItem
               depth={depth}
               gradingPeriodId={gradingPeriodId}
               gradingPeriods={gradingPeriods}
@@ -297,6 +304,15 @@ export function Navbar() {
         </NavigationMenu>
 
         <div className="flex items-center gap-2">
+          <Authenticated>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+          </Authenticated>
           <ThemeToggle />
           <Unauthenticated>
             <Button variant="outline" asChild>
@@ -308,6 +324,9 @@ export function Navbar() {
           </Authenticated>
         </div>
       </div>
+      <Authenticated>
+        <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+      </Authenticated>
     </nav>
   );
 }

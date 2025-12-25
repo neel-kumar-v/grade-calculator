@@ -53,9 +53,18 @@ const gradingPeriod = {
   core_gpa: v.optional(v.number()),
 }
 
+const settings = {
+  userId: v.id("users"),
+  gradingPeriodName: v.union(v.literal("Semesters"), v.literal("Trimesters"), v.literal("Quarters")),
+  gpaScale: v.string(),
+  customScale: v.optional(v.array(v.object({ minPercentage: v.number(), gpa: v.number() }))),
+  university: v.optional(v.string()),
+};
+
 const schema = defineSchema({
   ...authTables,
   gradingPeriods: defineTable(gradingPeriod).index("by_userId", ["userId"]),
+  settings: defineTable(settings).index("by_userId", ["userId"]),
 });
  
 export default schema;

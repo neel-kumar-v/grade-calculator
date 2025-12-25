@@ -1,28 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Calendar, Plus } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
 import { CreateGradingPeriodModal } from "./CreateGradingPeriodModal";
 import type { Doc } from "../convex/_generated/dataModel";
+import { getScaleByName, calculateGPA, SCALE_NAMES } from "../lib/gpa";
+import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 
 interface GradingPeriodsProps {
   gradingPeriods: Doc<"gradingPeriods">[] | undefined;
-}
-
-// Convert percentage (0-100) to GPA (0-4.0) using standard 4.0 scale
-export function percentageToGPA(percentage: number): number {
-  if (percentage >= 93) return 4.0;
-  if (percentage >= 90) return 3.7;
-  if (percentage >= 87) return 3.3;
-  if (percentage >= 83) return 3.0;
-  if (percentage >= 80) return 2.7;
-  if (percentage >= 77) return 2.3;
-  if (percentage >= 73) return 2.0;
-  if (percentage >= 70) return 1.7;
-  if (percentage >= 67) return 1.3;
-  if (percentage >= 65) return 1.0;
-  return 0.0;
 }
 
 // Calculate total credits for a grading period
@@ -32,6 +21,17 @@ function calculateTotalCredits(gradingPeriod: Doc<"gradingPeriods">): number {
 
 export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const settings = useQuery(api.settings.get);
+  const gradingPeriodName = useGradingPeriodName();
+
+  const scale = useMemo(() => {
+    if (!settings || !("gpaScale" in settings)) return getScaleByName("STANDARD_4_0");
+    const settingsDoc = settings as any;
+    return getScaleByName(settingsDoc.gpaScale, settingsDoc.customScale);
+  }, [settings]);
+
+  const isWAM = scale === "WAM";
+  const gpaLabel = isWAM ? "WAM" : "GPA";
 
   let content = null;
 
@@ -41,12 +41,12 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
     content = (
       <div className="flex flex-col items-center justify-center py-16 gap-6">
         <Calendar className="size-16 text-muted-foreground" />
-        <h2 className="text-3xl font-semibold">No grading periods yet</h2>
+        <h2 className="text-3xl font-semibold">No {gradingPeriodName.toLowerCase()} yet</h2>
         <p className="text-muted-foreground text-center max-w-md">
-          Get started by creating your first grading period.
+          Get started by creating your first {gradingPeriodName.toLowerCase()}.
         </p>
         <Button onClick={() => setIsModalOpen(true)} size="lg">
-          Create Grading Period
+          Create {gradingPeriodName.slice(0, -1)}
         </Button>
       </div>
     );
@@ -61,7 +61,7 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
           let totalCreditsForGPA = 0;
           for (const course of gradingPeriod.courses) {
             if (typeof course.grade === "number" && course.grade > 0) {
-              const courseGPA = percentageToGPA(course.grade);
+              const courseGPA = calculateGPA(course.grade, scale);
               totalWeightedGPA += courseGPA * course.credits;
               totalCreditsForGPA += course.credits;
             }
@@ -74,7 +74,7 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
           let totalCoreCredits = 0;
           for (const course of gradingPeriod.courses) {
             if (course.part_of_degree && typeof course.grade === "number" && course.grade > 0) {
-              const courseGPA = percentageToGPA(course.grade);
+              const courseGPA = calculateGPA(course.grade, scale);
               totalWeightedCoreGPA += courseGPA * course.credits;
               totalCoreCredits += course.credits;
             }
@@ -99,12 +99,12 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
                   <div className="flex flex-col items-end gap-px">
                     {gpa !== null && (
                       <div className="text-xl font-semibold">
-                        {gpa.toFixed(2)}
+                        {isWAM ? gpa.toFixed(2) + "%" : gpa.toFixed(2)}
                       </div>
                     )}
                     {coreGpa !== null && (
                       <div className="text-sm text-muted-foreground">
-                        {coreGpa.toFixed(2)}
+                        {isWAM ? coreGpa.toFixed(2) + "%" : coreGpa.toFixed(2)}
                       </div>
                     )}
                   </div>
@@ -120,10 +120,10 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
   return (
     <div className="flex flex-col gap-4 w-full container max-w-3xl mx-auto py-12">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Your Grading Periods</h1>
+        <h1 className="text-2xl font-bold">Your {gradingPeriodName}</h1>
         <Button onClick={() => setIsModalOpen(true)}>
           <Plus className="size-4" />
-          Add Grading Period
+          Add {gradingPeriodName.slice(0, -1)}
         </Button>
       </div>
       {content}

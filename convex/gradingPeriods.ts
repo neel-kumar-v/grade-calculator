@@ -2,6 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { auth } from "./auth";
 import schema, { gradingPeriodInput, course } from "./schema";
+import { getScaleByName, calculateGPA } from "../lib/gpa";
 
 async function getCurrentUserId(ctx: any) {
   const userId = await auth.getUserId(ctx);
@@ -11,19 +12,29 @@ async function getCurrentUserId(ctx: any) {
   return userId;
 }
 
-// Convert percentage (0-100) to GPA (0-4.0) using standard 4.0 scale
-function percentageToGPA(percentage: number): number {
-  if (percentage >= 93) return 4.0;
-  if (percentage >= 90) return 3.7;
-  if (percentage >= 87) return 3.3;
-  if (percentage >= 83) return 3.0;
-  if (percentage >= 80) return 2.7;
-  if (percentage >= 77) return 2.3;
-  if (percentage >= 73) return 2.0;
-  if (percentage >= 70) return 1.7;
-  if (percentage >= 67) return 1.3;
-  if (percentage >= 65) return 1.0;
-  return 0.0;
+// Get user settings and return the GPA scale
+async function getUserGPAScale(ctx: any): Promise<ReturnType<typeof getScaleByName>> {
+  try {
+    const userId = await getCurrentUserId(ctx);
+    const settings = await ctx.db
+      .query("settings")
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .first();
+
+    if (settings) {
+      return getScaleByName(settings.gpaScale, settings.customScale);
+    }
+  } catch {
+    // Fall through to default
+  }
+  // Default to STANDARD_4_0 if no settings found
+  return getScaleByName("STANDARD_4_0");
+}
+
+// Convert percentage (0-100) to GPA using user's scale
+async function percentageToGPA(ctx: any, percentage: number): Promise<number> {
+  const scale = await getUserGPAScale(ctx);
+  return calculateGPA(percentage, scale);
 }
 
 export const get = query({
@@ -57,13 +68,13 @@ export const create = mutation({
     }
     
     // Calculate and set GPA for all courses
-    const coursesWithGPA = calculateCoursesGPA(args.courses);
+    const coursesWithGPA = await calculateCoursesGPA(ctx, args.courses);
     
     // Calculate initial grades and GPAs
     const grade = calculateGradingPeriodGrade(coursesWithGPA);
     const core_grade = calculateCoreGrade(coursesWithGPA);
-    const gpa = calculateGradingPeriodGPA(coursesWithGPA);
-    const core_gpa = calculateCoreGPA(coursesWithGPA);
+    const gpa = await calculateGradingPeriodGPA(ctx, coursesWithGPA);
+    const core_gpa = await calculateCoreGPA(ctx, coursesWithGPA);
     
     const userId = await getCurrentUserId(ctx);
     return await ctx.db.insert("gradingPeriods", {
@@ -176,13 +187,14 @@ function calculateCoreGrade(courses: any[]): number {
 }
 
 // Calculate weighted average GPA for courses
-function calculateGradingPeriodGPA(courses: any[]): number | null {
+async function calculateGradingPeriodGPA(ctx: any, courses: any[]): Promise<number | null> {
+  const scale = await getUserGPAScale(ctx);
   let totalWeightedGPA = 0;
   let totalCredits = 0;
 
   for (const course of courses) {
     if (typeof course.grade === "number" && course.grade > 0) {
-      const courseGPA = percentageToGPA(course.grade);
+      const courseGPA = calculateGPA(course.grade, scale);
       totalWeightedGPA += courseGPA * course.credits;
       totalCredits += course.credits;
     }
@@ -193,13 +205,14 @@ function calculateGradingPeriodGPA(courses: any[]): number | null {
 }
 
 // Calculate weighted average GPA for core courses only
-function calculateCoreGPA(courses: any[]): number | null {
+async function calculateCoreGPA(ctx: any, courses: any[]): Promise<number | null> {
+  const scale = await getUserGPAScale(ctx);
   let totalWeightedGPA = 0;
   let totalCredits = 0;
 
   for (const course of courses) {
     if (course.part_of_degree && typeof course.grade === "number" && course.grade > 0) {
-      const courseGPA = percentageToGPA(course.grade);
+      const courseGPA = calculateGPA(course.grade, scale);
       totalWeightedGPA += courseGPA * course.credits;
       totalCredits += course.credits;
     }
@@ -210,11 +223,12 @@ function calculateCoreGPA(courses: any[]): number | null {
 }
 
 // Calculate and set GPA for a course
-function calculateCourseGPA(course: any): any {
+async function calculateCourseGPA(ctx: any, course: any): Promise<any> {
+  const scale = await getUserGPAScale(ctx);
   if (typeof course.grade === "number" && course.grade > 0) {
     return {
       ...course,
-      gpa: percentageToGPA(course.grade),
+      gpa: calculateGPA(course.grade, scale),
     };
   }
   return {
@@ -224,8 +238,9 @@ function calculateCourseGPA(course: any): any {
 }
 
 // Calculate and set GPA for all courses in an array
-function calculateCoursesGPA(courses: any[]): any[] {
-  return courses.map(calculateCourseGPA);
+async function calculateCoursesGPA(ctx: any, courses: any[]): Promise<any[]> {
+  const results = await Promise.all(courses.map(course => calculateCourseGPA(ctx, course)));
+  return results;
 }
 
 export const update = mutation({
@@ -252,13 +267,13 @@ export const update = mutation({
     if (args.isCompleted !== undefined) updateData.isCompleted = args.isCompleted;
     if (args.courses !== undefined) {
       // Calculate and set GPA for all courses
-      const coursesWithGPA = calculateCoursesGPA(args.courses);
+      const coursesWithGPA = await calculateCoursesGPA(ctx, args.courses);
       updateData.courses = coursesWithGPA;
       // Recalculate grades and GPAs when courses are updated
       updateData.grade = calculateGradingPeriodGrade(coursesWithGPA);
       updateData.core_grade = calculateCoreGrade(coursesWithGPA);
-      updateData.gpa = calculateGradingPeriodGPA(coursesWithGPA);
-      updateData.core_gpa = calculateCoreGPA(coursesWithGPA);
+      updateData.gpa = await calculateGradingPeriodGPA(ctx, coursesWithGPA);
+      updateData.core_gpa = await calculateCoreGPA(ctx, coursesWithGPA);
     }
 
     await ctx.db.patch(args.id, updateData);
@@ -282,11 +297,11 @@ export const updateGrades = mutation({
     }
 
     // Recalculate and set GPA for all courses
-    const coursesWithGPA = calculateCoursesGPA(gradingPeriod.courses);
+    const coursesWithGPA = await calculateCoursesGPA(ctx, gradingPeriod.courses);
     const grade = calculateGradingPeriodGrade(coursesWithGPA);
     const core_grade = calculateCoreGrade(coursesWithGPA);
-    const gpa = calculateGradingPeriodGPA(coursesWithGPA);
-    const core_gpa = calculateCoreGPA(coursesWithGPA);
+    const gpa = await calculateGradingPeriodGPA(ctx, coursesWithGPA);
+    const core_gpa = await calculateCoreGPA(ctx, coursesWithGPA);
 
     await ctx.db.patch(args.id, { 
       courses: coursesWithGPA,
@@ -317,14 +332,14 @@ export const addCourse = mutation({
 
     const newIndex = gradingPeriod.courses.length;
     // Calculate and set GPA for the new course
-    const courseWithGPA = calculateCourseGPA(args.course);
+    const courseWithGPA = await calculateCourseGPA(ctx, args.course);
     const updatedCourses = [...gradingPeriod.courses, courseWithGPA];
 
     // Recalculate grades and GPAs
     const grade = calculateGradingPeriodGrade(updatedCourses);
     const core_grade = calculateCoreGrade(updatedCourses);
-    const gpa = calculateGradingPeriodGPA(updatedCourses);
-    const core_gpa = calculateCoreGPA(updatedCourses);
+    const gpa = await calculateGradingPeriodGPA(ctx, updatedCourses);
+    const core_gpa = await calculateCoreGPA(ctx, updatedCourses);
 
     await ctx.db.patch(args.id, {
       courses: updatedCourses,
@@ -370,14 +385,14 @@ export const updateCourse = mutation({
 
     const courses = [...gradingPeriod.courses];
     // Calculate and set GPA for the updated course
-    const courseWithGPA = calculateCourseGPA(args.course);
+    const courseWithGPA = await calculateCourseGPA(ctx, args.course);
     courses[index] = courseWithGPA;
 
     // Recalculate grades and GPAs
     const grade = calculateGradingPeriodGrade(courses);
     const core_grade = calculateCoreGrade(courses);
-    const gpa = calculateGradingPeriodGPA(courses);
-    const core_gpa = calculateCoreGPA(courses);
+    const gpa = await calculateGradingPeriodGPA(ctx, courses);
+    const core_gpa = await calculateCoreGPA(ctx, courses);
 
     await ctx.db.patch(args.gradingPeriodId, { 
       courses, 
@@ -421,8 +436,8 @@ export const removeCourse = mutation({
     // Recalculate grades and GPAs
     const grade = calculateGradingPeriodGrade(courses);
     const core_grade = calculateCoreGrade(courses);
-    const gpa = calculateGradingPeriodGPA(courses);
-    const core_gpa = calculateCoreGPA(courses);
+    const gpa = await calculateGradingPeriodGPA(ctx, courses);
+    const core_gpa = await calculateCoreGPA(ctx, courses);
 
     await ctx.db.patch(args.gradingPeriodId, {
       courses,
