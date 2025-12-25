@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <style>
+    /* Light mode (default) - dark text */
+    .text {
+      fill: #000000;
+      font-family: Arial, sans-serif;
+      font-weight: bold;
+    }
+    
+    /* Dark mode - white text */
+    @media (prefers-color-scheme: dark) {
+      .text {
+        fill: #ffffff;
+      }
+    }
+  </style>
+  
+  <!-- A+ text -->
+  <text class="text" x="256" y="256" font-size="420" text-anchor="middle" dominant-baseline="central">A+</text>
+</svg>
+
