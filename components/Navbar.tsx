@@ -196,7 +196,7 @@ function CourseNavItem({
                       className="flex items-center justify-between"
                     >
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium">{course.name}</span>
+                        <span className="text-sm font-medium text-nowrap">{course.name}</span>
                       </div>
                     </Link>
                   </NavigationMenuLink>
@@ -285,7 +285,7 @@ export function Navbar() {
               >
                 <Link href="/" className="relative">
                   <Weight className="size-10 stroke-1 text-text" />
-                  <span className="absolute inset-0 top-1.5 flex items-center justify-center text-text font-bold text-[1em] leading-none">
+                  <span className="absolute inset-0 top-2.5 flex items-center justify-center text-text font-bold text-[1em] leading-none">
                     A<sup className="text-[0.8em] -translate-x-0.5 leading-none">+</sup>
                   </span>
                 </Link>
