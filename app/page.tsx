@@ -177,7 +177,7 @@ export default function Home() {
       <Authenticated>
         <AuthWrapper setIsAuthenticated={setIsAuthenticated}>
           {gradingPeriods && gradingPeriods.length > 0 && (overallGPA !== null || overallCoreGPA !== null) && (
-            <div className="w-full mb-8 p-6 rounded-lg bg-black/3 dark:bg-card">
+            <div className="w-full mb-8 p-6 rounded-lg bg-card">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold">Overall {gpaLabel}</h2>

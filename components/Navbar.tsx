@@ -279,7 +279,7 @@ export function Navbar() {
                 className="hover:bg-transparent focus:bg-transparent flex flex-row items-center gap-2 font-semibold"
               >
                 <Link href="/" className="relative">
-                  <Weight className="size-10 stroke-1 text-black dark:text-white" />
+                  <Weight className="size-10 stroke-1 text-text" />
                   <span className="absolute inset-0 top-1.5 flex items-center justify-center text-text font-bold text-[1em] leading-none">
                     A<sup className="text-[0.8em] -translate-x-0.5 leading-none">+</sup>
                   </span>
