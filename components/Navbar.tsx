@@ -96,11 +96,11 @@ function GradingPeriodNavItem({
     return (
       <NavigationMenuItem>
         <NavigationMenuTrigger className="font-medium">
-          <span className="flex items-center gap-1">{gradingPeriodName}</span>
+          <span className="flex items-center gap-0">{gradingPeriodName}</span>
         </NavigationMenuTrigger>
         {hasList && (
           <NavigationMenuContent>
-            <ul className="flex flex-col w-full gap-1">
+            <ul className="flex flex-col w-full gap-0">
               {gradingPeriods!.map((period) => (
                 <li key={period._id}>
                   <NavigationMenuLink asChild>
@@ -108,7 +108,7 @@ function GradingPeriodNavItem({
                       href={`/${period._id}`}
                       className="flex items-center justify-between"
                     >
-                      <span>{period.name}</span>
+                      <span className="text-sm font-medium p-0.5">{period.name}</span>
                     </Link>
                   </NavigationMenuLink>
                 </li>
@@ -133,13 +133,13 @@ function GradingPeriodNavItem({
   return (
     <NavigationMenuItem>
       <NavigationMenuTrigger className="font-medium">
-        <Link href={`/${gradingPeriodId}`} className="flex items-center gap-1">
+        <Link href={`/${gradingPeriodId}`} className="flex items-center gap-0">
           {label}
         </Link>
       </NavigationMenuTrigger>
       {hasList && (
         <NavigationMenuContent>
-          <ul className="flex flex-col w-full gap-1">
+          <ul className="flex flex-col w-full gap-0">
             {gradingPeriods!.map((period) => (
               <li key={period._id}>
                 <NavigationMenuLink asChild>
@@ -147,7 +147,7 @@ function GradingPeriodNavItem({
                     href={`/${period._id}`}
                     className="flex items-center justify-between"
                   >
-                    <span>{period.name}</span>
+                    <span className="text-sm font-medium p-0.5">{period.name}</span>
                   </Link>
                 </NavigationMenuLink>
               </li>
@@ -183,11 +183,11 @@ function CourseNavItem({
     return (
       <NavigationMenuItem>
         <NavigationMenuTrigger className="font-medium">
-          <span className="flex items-center gap-1">Courses</span>
+          <span className="flex items-center gap-0">Courses</span>
         </NavigationMenuTrigger>
         {hasList && (
           <NavigationMenuContent>
-            <ul className="flex flex-col w-full gap-1">
+            <ul className="flex flex-col w-full gap-0">
               {courses.map((course, index) => (
                 <li key={index}>
                   <NavigationMenuLink asChild>
@@ -196,7 +196,7 @@ function CourseNavItem({
                       className="flex items-center justify-between"
                     >
                       <div className="flex flex-col">
-                        <span className="text-sm font-medium text-nowrap">{course.name}</span>
+                        <span className="text-sm font-medium text-nowrap p-0.5">{course.name}</span>
                       </div>
                     </Link>
                   </NavigationMenuLink>
@@ -226,14 +226,14 @@ function CourseNavItem({
       <NavigationMenuTrigger className="font-medium">
         <Link
           href={`/${gradingPeriodId}/${courseIndex}`}
-          className="flex items-center gap-1"
+          className="flex items-center gap-0"
         >
           {label}
         </Link>
       </NavigationMenuTrigger>
       {hasList && (
         <NavigationMenuContent>
-          <ul className="flex flex-col w-full gap-1">
+          <ul className="flex flex-col w-full gap-0">
             {courses.map((course, index) => (
               <li key={index}>
                 <NavigationMenuLink asChild>

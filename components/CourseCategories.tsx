@@ -487,7 +487,7 @@ export function CourseCategories({
                 size="icon"
                 title="Remove category"
                 fakeButton
-                className="absolute left-0 -translate-x-10 opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                className="absolute left-0 -translate-x-10 opacity-0 group-hover:opacity-100 duration-100 group-hover:duration-0 transition-opacity z-10 cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
                   removeCategory(catIndex);

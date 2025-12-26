@@ -141,7 +141,7 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
                 size="icon"
                 title="Edit course"
                 fakeButton
-                className="absolute left-0 -translate-x-10 translate-y-4 self-center opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                className="absolute left-0 -translate-x-10 translate-y-4 duration-100 group-hover:duration-0 self-center opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
