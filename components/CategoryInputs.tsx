@@ -44,6 +44,8 @@ interface CategoryInputsProps {
   onRemoveAssignment: (catIndex: number, assignIndex: number) => void;
   categoryGrade: (cat: Category, allCategories?: Category[]) => number;
   percentLabel: (val: number) => string;
+  whatIf?: boolean;
+  normalizedCategories?: Category[];
 }
 
 export function CategoryInputs({
@@ -58,6 +60,8 @@ export function CategoryInputs({
   onRemoveAssignment,
   categoryGrade,
   percentLabel,
+  whatIf = false,
+  normalizedCategories = [],
 }: CategoryInputsProps) {
   if (category.manual) {
     return (
@@ -301,37 +305,45 @@ export function CategoryInputs({
 // Helper function to render category grade display
 export function renderCategoryGradeDisplay(
   category: Category,
+  actualCategory: Category,
   allCategories: Category[],
+  normalizedCategories: Category[],
   categoryGrade: (cat: Category, allCategories?: Category[]) => number,
   percentLabel: (val: number) => string,
-  whatIfSim?: number | null
+  whatIfSim?: number | null,
+  actualGrade?: number
 ) {
-  const actual = categoryGrade(category, allCategories);
+  const actual = actualGrade !== undefined ? actualGrade : categoryGrade(actualCategory, normalizedCategories);
   const weight = category.weight;
-  const actualWeighted = actual * weight / 100;
+  const actualWeighted = actual * weight;
   
   if (whatIfSim === null || whatIfSim === undefined) {
     return (
       <div className="flex flex-row items-center gap-2">
         <span className="text-sm text-muted-foreground">{percentLabel(actual)}</span>
-        <span>{percentLabel(actualWeighted)}</span>
+        <span className="text-lg font-semibold text-foreground">{actualWeighted.toFixed(2).replace(/\.00$/, '')}%</span>
       </div>
     );
   }
   
-  const simWeighted = whatIfSim * weight / 100;
+  const simWeighted = whatIfSim * weight;
   const diff = simWeighted - actualWeighted;
-  const color = diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-muted-foreground";
+  const color = diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-foreground";
   return (
-    <div className="flex flex-col items-end gap-0.5">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground">{percentLabel(actual)}</span>
-        <span className="text-sm text-muted-foreground">{percentLabel(whatIfSim)}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span>{percentLabel(actualWeighted)}</span>
-        <span className={color}>{percentLabel(simWeighted)}</span>
-      </div>
+    <div className="flex flex-row items-center gap-2">
+      <span className="text-sm text-muted-foreground">{percentLabel(whatIfSim)}</span>
+      <span className={`text-lg font-semibold ${color}`}>{simWeighted.toFixed(2).replace(/\.00$/, '')}%</span>
+      <span
+        className={
+          diff > 0
+            ? "text-green-600 text-sm"
+            : diff < 0
+              ? "text-red-600 text-sm"
+              : "text-muted-foreground text-sm"
+        }
+      >
+        {Math.abs(diff).toFixed(2).replace(/\.00$/, '')}%
+      </span>
     </div>
   );
 }

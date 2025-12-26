@@ -41,18 +41,34 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  fakeButton = false,
+  onClick,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
+    fakeButton?: boolean
   }) {
-  const Comp = asChild ? Slot : "button"
+  const Comp = fakeButton ? "div" : (asChild ? Slot : "button")
+
+  const handleKeyDown = fakeButton && onClick
+    ? (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick(e as any);
+        }
+      }
+    : undefined;
 
   return (
     <Comp
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      role={fakeButton ? "button" : undefined}
+      tabIndex={fakeButton ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

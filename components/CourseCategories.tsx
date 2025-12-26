@@ -25,7 +25,6 @@ import { CreateCategoryModal } from "./CreateCategoryModal";
 import { PublishTemplateModal } from "./templates/PublishTemplateModal";
 import { ImportTemplateModal } from "./templates/ImportTemplateModal";
 import { CategoryInputs, renderCategoryGradeDisplay } from "./CategoryInputs";
-import { TourStep } from "./ui/guided-tour";
 import { Plus, Trash, TriangleAlert, Download, Upload } from "lucide-react";
 
 type GradingPeriod = Doc<"gradingPeriods">;
@@ -276,6 +275,25 @@ export function CourseCategories({
     });
   };
 
+  const removeCategory = (catIndex: number) => {
+    if (whatIf) {
+      setDraftCourse((prev) => {
+        if (!prev) return prev;
+        const categories = [...(prev.categories ?? [])];
+        categories.splice(catIndex, 1);
+        return { ...prev, categories };
+      });
+    } else {
+      setLiveCourse((prev) => {
+        const categories = [...(prev.categories ?? [])];
+        categories.splice(catIndex, 1);
+        const next = { ...prev, categories };
+        updateLocalAndPersist(next);
+        return next;
+      });
+    }
+  };
+
   const handleAddCategory = (category: Category) => {
     const target = whatIf && draftCourse ? draftCourse : liveCourse;
     const nextCategories = [...(target.categories ?? []), category];
@@ -356,12 +374,16 @@ export function CourseCategories({
   const renderCategoryGrade = (cat: Category, idx: number) => {
     const actual = categoryGrade(normalized.categories?.[idx] ?? cat, normalized.categories ?? []);
     const sim = whatIf && draftCourse ? categoryGrade(cat, draftCourse.categories ?? []) : null;
+    const actualNormalized = normalized.categories?.[idx] ?? cat;
     return renderCategoryGradeDisplay(
       cat,
+      actualNormalized,
       workingCourse.categories ?? [],
+      normalized.categories ?? [],
       categoryGrade,
       percentLabel,
-      sim
+      sim,
+      actual
     );
   };
 
@@ -399,9 +421,17 @@ export function CourseCategories({
                 <Button variant="outline" onClick={handleSave}>Save changes</Button>
               </>
             )}
+            <Button
+              variant="outline"
+              onClick={() => setIsCategoryModalOpen(true)}
+              type="button"
+            >
+              <Plus className="size-4" />
+              Add Category
+            </Button>
             {(normalized.categories ?? []).length === 0 ? (
               <Button
-                variant="outline"
+                variant="default"
                 onClick={() => setIsImportModalOpen(true)}
                 type="button"
               >
@@ -410,7 +440,7 @@ export function CourseCategories({
               </Button>
             ) : (
               <Button
-                variant="outline"
+                variant="default"
                 onClick={() => setIsPublishModalOpen(true)}
                 type="button"
               >
@@ -451,7 +481,20 @@ export function CourseCategories({
         <Accordion type="multiple" className="w-full">
         {(workingCourse.categories ?? []).map((category, catIndex) => (
           <AccordionItem key={catIndex} value={`cat-${catIndex}`}>
-            <AccordionTrigger>
+            <AccordionTrigger className="group relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Remove category"
+                fakeButton
+                className="absolute left-0 -translate-x-10 opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeCategory(catIndex);
+                }}
+              >
+                <Trash className="size-4 stroke-destructive" />
+              </Button>
               <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-medium">{category.name}</span>
@@ -459,7 +502,7 @@ export function CourseCategories({
                     <span className="text-xs text-muted-foreground">Extra credit</span>
                   )}
                 </div>
-                <div className="text-lg  font-medium">
+                <div className="text-lg font-medium">
                   {renderCategoryGrade(category, catIndex)}
                 </div>
               </div>
@@ -477,6 +520,8 @@ export function CourseCategories({
                 onRemoveAssignment={removeAssignment}
                 categoryGrade={categoryGrade}
                 percentLabel={percentLabel}
+                whatIf={whatIf}
+                normalizedCategories={normalized.categories ?? []}
               />
             </AccordionContent>
           </AccordionItem>
@@ -593,9 +638,7 @@ export function CourseCategories({
                         : "text-muted-foreground"
                   }
                 >
-                  ({(simulatedGrade - actualGrade >= 0 ? "+" : "") +
-                    ((simulatedGrade - actualGrade) * 100).toFixed(2) +
-                    "%"})
+                  {Math.abs(simulatedGrade - actualGrade).toFixed(2).replace(/\.00$/, '')}%
                 </span>
               </div>
             )}
