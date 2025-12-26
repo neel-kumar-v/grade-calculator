@@ -2,19 +2,10 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { BookOpen, Plus, Trash, Check } from "lucide-react";
+import { BookOpen, Plus, Pencil } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-  ContextMenuCheckboxItem,
-  ContextMenuSeparator,
-} from "./ui/context-menu";
 import { CreateCourseModal } from "./CreateCourseModal";
 import type { Doc, Id } from "../convex/_generated/dataModel";
 import { getScaleByName, calculateGPA, convertGradeToLetter, SCALE_NAMES } from "../lib/gpa";
@@ -32,10 +23,8 @@ function calculateTotalCredits(gradingPeriod: Doc<"gradingPeriods">): number {
 
 export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
-  const [gradeValues, setGradeValues] = useState<Record<number, string>>({});
-  const updateCourse = useMutation(api.gradingPeriods.updateCourse);
+  const [editingCourseIndex, setEditingCourseIndex] = useState<number | null>(null);
   const updateGrades = useMutation(api.gradingPeriods.updateGrades);
-  const removeCourse = useMutation(api.gradingPeriods.removeCourse);
   const settings = useQuery(api.settings.get);
   const gradingPeriodName = useGradingPeriodName();
 
@@ -91,43 +80,14 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   }
   periodCoreGPA = totalCoreCredits > 0 ? totalWeightedCoreGPA / totalCoreCredits : null;
 
-  const handleGradeChange = (index: number, value: string) => {
-    setGradeValues(prev => ({ ...prev, [index]: value }));
+  const handleEditCourse = (index: number) => {
+    setEditingCourseIndex(index);
+    setIsCourseModalOpen(true);
   };
 
-  const handleGradeSave = async (index: number) => {
-    const course = gradingPeriod.courses[index];
-    if (!course || !course.manual) return;
-
-    const value = gradeValues[index] ?? course.grade.toFixed(2);
-    const newGrade = parseFloat(value);
-    if (isNaN(newGrade) || newGrade < 0 || newGrade > 100) {
-      // Reset to original value if invalid
-      setGradeValues(prev => {
-        const updated = { ...prev };
-        delete updated[index];
-        return updated;
-      });
-      return;
-    }
-
-    const updatedCourse = {
-      ...course,
-      grade: newGrade,
-    };
-
-    await updateCourse({
-      gradingPeriodId,
-      courseIndex: index,
-      course: updatedCourse,
-    });
-
-    // Clear the local value after saving
-    setGradeValues(prev => {
-      const updated = { ...prev };
-      delete updated[index];
-      return updated;
-    });
+  const handleModalClose = () => {
+    setIsCourseModalOpen(false);
+    setEditingCourseIndex(null);
   };
 
   return (
@@ -175,81 +135,58 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
       ) : (
         <div className="flex flex-col gap-2">
           {gradingPeriod.courses.map((course, index) => (
-            <ContextMenu key={index}>
-              <ContextMenuTrigger asChild>
-                <Link
-                  href={`/${gradingPeriodId}/${index}`}
-                  className="block"
-                >
-                  <div className="p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="text-base font-semibold">{course.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {course.credits} credit
-                          {course.credits !== 1 ? "s" : ""}
-                        </div>
-                      </div>
-                      <div className="flex flex-row gap-4">
-                        {typeof course.grade === "number" && (
-                          <div className="flex items-center gap-2 text-md font-medium text-muted-foreground">
-                            {course.grade.toFixed(2)}%
-                          </div>
-                        )}
-                        <span className="text-xl flex items-center min-w-10 justify-center font-semibold">
-                          {convertGradeToLetter(course.grade)}
-                        </span>
+            <div key={index} className="group relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Edit course"
+                fakeButton
+                className="absolute left-0 -translate-x-10 translate-y-4 self-center opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleEditCourse(index);
+                }}
+              >
+                <Pencil className="size-4" />
+              </Button>
+              <Link
+                href={`/${gradingPeriodId}/${index}`}
+                className="block"
+              >
+                <div className="p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="text-base font-semibold">{course.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {course.credits} credit
+                        {course.credits !== 1 ? "s" : ""}
                       </div>
                     </div>
+                    <div className="flex flex-row gap-4">
+                      {typeof course.grade === "number" && (
+                        <div className="flex items-center gap-2 text-md font-medium text-muted-foreground">
+                          {course.grade.toFixed(2)}%
+                        </div>
+                      )}
+                      <span className="text-xl flex items-center min-w-10 justify-center font-semibold">
+                        {convertGradeToLetter(course.grade)}
+                      </span>
+                    </div>
                   </div>
-                </Link>
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuCheckboxItem
-                  checked={course.part_of_degree}
-                  onCheckedChange={async (checked) => {
-                    const updatedCourse = {
-                      ...course,
-                      part_of_degree: checked,
-                    };
-                    await updateCourse({
-                      gradingPeriodId,
-                      courseIndex: index,
-                      course: updatedCourse,
-                    });
-                    // Trigger GPA refresh
-                    await updateGrades({ id: gradingPeriodId });
-                  }}
-                >
-                  Part of Core Curriculum
-                </ContextMenuCheckboxItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem
-                  variant="destructive"
-                  onClick={async (e: React.MouseEvent) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    await removeCourse({
-                      gradingPeriodId,
-                      courseIndex: index,
-                    });
-                    // Trigger GPA refresh
-                    await updateGrades({ id: gradingPeriodId });
-                  }}
-                >
-                  <Trash className="size-4" />
-                  Delete Course
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
+                </div>
+              </Link>
+            </div>
           ))}
         </div>
       )}
 
       <CreateCourseModal
         open={isCourseModalOpen}
-        onOpenChange={setIsCourseModalOpen}
+        onOpenChange={handleModalClose}
         gradingPeriodId={gradingPeriodId}
+        editingCourse={editingCourseIndex !== null ? gradingPeriod.courses[editingCourseIndex] : undefined}
+        courseIndex={editingCourseIndex ?? undefined}
       />
     </div>
   );
