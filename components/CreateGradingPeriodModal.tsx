@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "../convex/_generated/api";
-import { Id } from "../convex/_generated/dataModel";
+import { Id, Doc } from "../convex/_generated/dataModel";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -18,26 +19,41 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Trash } from "lucide-react";
 import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 
 interface CreateGradingPeriodModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (gradingPeriodId: Id<"gradingPeriods">) => void | Promise<void>;
+  editingGradingPeriod?: Doc<"gradingPeriods">;
 }
 
 export function CreateGradingPeriodModal({
   open,
   onOpenChange,
   onSuccess,
+  editingGradingPeriod,
 }: CreateGradingPeriodModalProps) {
   const router = useRouter();
   const createGradingPeriod = useMutation(api.gradingPeriods.create);
+  const updateGradingPeriod = useMutation(api.gradingPeriods.update);
+  const removeGradingPeriod = useMutation(api.gradingPeriods.remove);
   const gradingPeriodName = useGradingPeriodName();
+  const isEditMode = editingGradingPeriod !== undefined;
   const [name, setName] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pre-fill form when editing
+  useEffect(() => {
+    if (isEditMode && editingGradingPeriod) {
+      setName(editingGradingPeriod.name);
+      setIsCompleted(editingGradingPeriod.isCompleted ?? false);
+    } else {
+      resetForm();
+    }
+  }, [isEditMode, editingGradingPeriod, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,40 +61,78 @@ export function CreateGradingPeriodModal({
 
     setIsSubmitting(true);
     try {
-      const gradingPeriodId = await createGradingPeriod({
-        name: name.trim(),
-        isCompleted,
-        courses: [],
-      });
-      onOpenChange(false);
-      setName("");
-      setIsCompleted(false);
-      
-      if (onSuccess) {
-        await onSuccess(gradingPeriodId);
+      if (isEditMode && editingGradingPeriod) {
+        // Update existing grading period
+        await updateGradingPeriod({
+          id: editingGradingPeriod._id,
+          name: name.trim(),
+          isCompleted,
+        });
+        toast.success("Grading period updated successfully");
       } else {
-        router.push(`/${gradingPeriodId as string}`);
+        // Create new grading period
+        const gradingPeriodId = await createGradingPeriod({
+          name: name.trim(),
+          isCompleted,
+          courses: [],
+        });
+        
+        if (onSuccess) {
+          await onSuccess(gradingPeriodId);
+        } else {
+          router.push(`/${gradingPeriodId as string}`);
+        }
       }
+      onOpenChange(false);
+      resetForm();
     } catch (error) {
-      console.error("Failed to create grading period:", error);
+      console.error(`Failed to ${isEditMode ? "update" : "create"} grading period:`, error);
+      toast.error(`Failed to ${isEditMode ? "update" : "create"} grading period. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleCancel = () => {
-    onOpenChange(false);
+  const resetForm = () => {
     setName("");
     setIsCompleted(false);
+  };
+
+  const handleCancel = () => {
+    onOpenChange(false);
+    resetForm();
+  };
+
+  const handleDelete = async () => {
+    if (!isEditMode || !editingGradingPeriod) return;
+
+    setIsSubmitting(true);
+    try {
+      await removeGradingPeriod({
+        id: editingGradingPeriod._id,
+      });
+      toast.success("Grading period deleted successfully");
+      onOpenChange(false);
+      resetForm();
+      // Navigate back to home page after deletion
+      router.push("/");
+    } catch (error) {
+      console.error("Failed to delete grading period:", error);
+      toast.error("Failed to delete grading period. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create {gradingPeriodName.slice(0, -1)}</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Grading Period" : `Create ${gradingPeriodName.slice(0, -1)}`}</DialogTitle>
           <DialogDescription>
-            Create a new {gradingPeriodName.toLowerCase().slice(0, -1)} to track your courses and grades.
+            {isEditMode 
+              ? "Edit the grading period details." 
+              : `Create a new ${gradingPeriodName.toLowerCase().slice(0, -1)} to track your courses and grades.`}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -121,13 +175,29 @@ export function CreateGradingPeriodModal({
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting || !name.trim()}>
-              {isSubmitting ? "Creating..." : "Create"}
-            </Button>
+          <DialogFooter className="flex items-center justify-between">
+            {isEditMode && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isSubmitting}
+                className="mr-auto"
+              >
+                <Trash className="size-4" />
+                Delete Grading Period
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting || !name.trim()}>
+                {isSubmitting 
+                  ? (isEditMode ? "Saving..." : "Creating...") 
+                  : (isEditMode ? "Save Edits" : "Create")}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
