@@ -62,15 +62,17 @@ function Button({
 
   return (
     <Comp
-      data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      role={fakeButton ? "button" : undefined}
-      tabIndex={fakeButton ? 0 : undefined}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
+      {...({
+        "data-slot": "button",
+        "data-variant": variant,
+        "data-size": size,
+        role: fakeButton ? "button" : undefined,
+        tabIndex: fakeButton ? 0 : undefined,
+        onClick,
+        onKeyDown: handleKeyDown,
+        className: cn(buttonVariants({ variant, size, className })),
+        ...props,
+      } as any)}
     />
   )
 }

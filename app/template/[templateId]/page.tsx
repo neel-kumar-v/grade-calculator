@@ -253,7 +253,7 @@ export default function TemplatePage({ params }: PageProps) {
   };
 
   const categoryGradeFn = (cat: Category & { assignments?: Assignment[] }, allCats?: Category[]) => {
-    return categoryGrade(cat, allCats as (Category & { assignments?: Assignment[] })[]);
+    return categoryGrade(cat);
   };
 
   return (
@@ -281,6 +281,8 @@ export default function TemplatePage({ params }: PageProps) {
                 <div className="text-lg font-medium">
                   {renderCategoryGradeDisplay(
                     category,
+                    category,
+                    localCategories,
                     localCategories,
                     categoryGradeFn,
                     percentLabel
