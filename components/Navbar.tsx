@@ -38,9 +38,13 @@ function useNavContext(): NavContext {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
 
+  // Check if this is a template route
+  const isTemplateRoute = segments[0] === "template";
+
   const depth = segments.length;
-  const gradingPeriodId = depth >= 1 ? segments[0] : null;
-  const courseIndexRaw = depth >= 2 ? Number(segments[1]) : NaN;
+  // Only treat as gradingPeriodId if it's not a template route
+  const gradingPeriodId = depth >= 1 && !isTemplateRoute ? segments[0] : null;
+  const courseIndexRaw = depth >= 2 && !isTemplateRoute ? Number(segments[1]) : NaN;
   const courseIndex =
     Number.isFinite(courseIndexRaw) && courseIndexRaw >= 0
       ? courseIndexRaw
@@ -51,9 +55,10 @@ function useNavContext(): NavContext {
   // Always call hooks in the same order on every render.
   // Switch query + args based on whether we have a gradingPeriodId,
   // but still invoke a single useQuery call.
+  // Skip the query if this is a template route
   const currentGradingPeriod = useQuery(
-    gradingPeriodId ? api.gradingPeriods.getById : api.gradingPeriods.get,
-    gradingPeriodId
+    gradingPeriodId && !isTemplateRoute ? api.gradingPeriods.getById : api.gradingPeriods.get,
+    gradingPeriodId && !isTemplateRoute
       ? { id: gradingPeriodId as Id<"gradingPeriods"> }
       : {}
   );

@@ -61,10 +61,26 @@ const settings = {
   university: v.optional(v.string()),
 };
 
+const template = {
+  university: v.string(),
+  courseCode: v.string(),
+  courseTitle: v.string(),
+  instructor: v.string(),
+  categories: v.array(category),
+  public: v.boolean(),
+  downloadCount: v.number(),
+  createdAt: v.number(),
+  createdBy: v.optional(v.id("users")),
+};
+
 const schema = defineSchema({
   ...authTables,
   gradingPeriods: defineTable(gradingPeriod).index("by_userId", ["userId"]),
   settings: defineTable(settings).index("by_userId", ["userId"]),
+  templates: defineTable(template)
+    .index("by_university", ["university"])
+    .index("by_public", ["public"])
+    .index("by_university_public", ["university", "public"]),
 });
  
 export default schema;

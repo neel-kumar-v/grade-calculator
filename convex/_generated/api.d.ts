@@ -13,6 +13,7 @@ import type * as gradingPeriods from "../gradingPeriods.js";
 import type * as http from "../http.js";
 import type * as resetPassword from "../resetPassword.js";
 import type * as settings from "../settings.js";
+import type * as templates from "../templates.js";
 import type * as validPassword from "../validPassword.js";
 
 import type {
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   resetPassword: typeof resetPassword;
   settings: typeof settings;
+  templates: typeof templates;
   validPassword: typeof validPassword;
 }>;
 

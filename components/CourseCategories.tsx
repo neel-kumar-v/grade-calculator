@@ -22,7 +22,11 @@ import {
   SelectValue,
 } from "./ui/select";
 import { CreateCategoryModal } from "./CreateCategoryModal";
-import { Plus, Trash, TriangleAlert } from "lucide-react";
+import { PublishTemplateModal } from "./templates/PublishTemplateModal";
+import { ImportTemplateModal } from "./templates/ImportTemplateModal";
+import { CategoryInputs, renderCategoryGradeDisplay } from "./CategoryInputs";
+import { TourStep } from "./ui/guided-tour";
+import { Plus, Trash, TriangleAlert, Download, Upload } from "lucide-react";
 
 type GradingPeriod = Doc<"gradingPeriods">;
 type Course = GradingPeriod["courses"][number];
@@ -159,6 +163,8 @@ export function CourseCategories({
   const [draftCourse, setDraftCourse] = useState<Course | null>(null);
   const [liveCourse, setLiveCourse] = useState<Course>(() => normalizeCourse(course));
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   // Track input string values for decimal inputs
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
 
@@ -302,6 +308,41 @@ export function CourseCategories({
     setDraftCourse(null);
   };
 
+  const incrementDownload = useMutation(api.templates.incrementDownload);
+
+  const handleImportTemplate = async (template: Doc<"templates">) => {
+    // Initialize categories from template with grades set to 100
+    const importedCategories: Category[] = template.categories.map((cat) => {
+      if (cat.manual) {
+        return {
+          ...cat,
+          grade: 100,
+          assignments: undefined,
+        } as Category;
+      } else {
+        return {
+          ...cat,
+          grade: 0,
+          assignments: [{ score: 100, max_score: 100 }],
+        } as Category;
+      }
+    });
+
+    const nextCourse = {
+      ...liveCourse,
+      categories: importedCategories,
+    };
+
+    updateLocalAndPersist(nextCourse);
+
+    // Increment download count
+    try {
+      await incrementDownload({ id: template._id });
+    } catch (error) {
+      console.error("Failed to increment download count:", error);
+    }
+  };
+
   const toggleWhatIf = () => {
     if (!whatIf) {
       setDraftCourse(normalizeCourse(course));
@@ -315,37 +356,12 @@ export function CourseCategories({
   const renderCategoryGrade = (cat: Category, idx: number) => {
     const actual = categoryGrade(normalized.categories?.[idx] ?? cat, normalized.categories ?? []);
     const sim = whatIf && draftCourse ? categoryGrade(cat, draftCourse.categories ?? []) : null;
-    const percent = (val: number) => {
-      const num = val * 100;
-      // Remove .00 but keep other decimals like .50
-      return `${num.toFixed(2).replace(/\.00$/, '')}%`;
-    };
-    const weight = cat.weight;
-    const actualWeighted = actual * weight / 100;
-    const simWeighted = sim !== null ? sim * weight / 100 : null;
-    
-    if (sim === null) {
-      return (
-        <div className="flex flex-row items-center gap-2">
-          <span className="text-sm text-muted-foreground">{percent(actual)}</span>
-          <span>{percent(actualWeighted)}</span>
-        </div>
-      );
-    }
-    
-    const diff = simWeighted! - actualWeighted;
-    const color = diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-muted-foreground";
-    return (
-      <div className="flex flex-col items-end gap-0.5">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">{percent(actual)}</span>
-          <span className="text-sm text-muted-foreground">{percent(sim)}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span>{percent(actualWeighted)}</span>
-          <span className={color}>{percent(simWeighted!)}</span>
-        </div>
-      </div>
+    return renderCategoryGradeDisplay(
+      cat,
+      workingCourse.categories ?? [],
+      categoryGrade,
+      percentLabel,
+      sim
     );
   };
 
@@ -383,10 +399,25 @@ export function CourseCategories({
                 <Button variant="outline" onClick={handleSave}>Save changes</Button>
               </>
             )}
-            <Button variant="outline" className="ml-2" onClick={() => setIsCategoryModalOpen(true)}>
-              <Plus className="size-4" />
-              Add Category
-            </Button>
+            {(normalized.categories ?? []).length === 0 ? (
+              <Button
+                variant="outline"
+                onClick={() => setIsImportModalOpen(true)}
+                type="button"
+              >
+                <Download className="size-4" />
+                Import Template
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => setIsPublishModalOpen(true)}
+                type="button"
+              >
+                <Upload className="size-4" />
+                Publish Template
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -434,245 +465,19 @@ export function CourseCategories({
               </div>
             </AccordionTrigger>
             <AccordionContent>
-              {category.manual ? (
-                <div className="space-y-3">
-                  {/* <Label className="text-sm">Manual grade (fraction)</Label> */}
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="text"
-                      value={inputValues[`manual-grade-${catIndex}`] ?? String((category.grade / 100) * 100)}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        const key = `manual-grade-${catIndex}`;
-                        // Allow empty, numbers, and decimal point
-                        if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
-                          // Store the string value for display
-                          setInputValues(prev => ({ ...prev, [key]: value }));
-                          // Update the actual value if it's a complete number
-                          if (value !== "" && value !== "." && !value.endsWith(".")) {
-                            const numValue = Number(value);
-                            if (!isNaN(numValue)) {
-                              setCategory(catIndex, (c) => ({
-                                ...c,
-                                grade: numValue,
-                              }));
-                            }
-                          }
-                        }
-                      }}
-                      onBlur={(e) => {
-                        const value = e.target.value;
-                        const key = `manual-grade-${catIndex}`;
-                        const numValue = value === "" || value === "." ? 0 : Number(value) || 0;
-                        setCategory(catIndex, (c) => ({
-                          ...c,
-                          grade: numValue,
-                        }));
-                        setInputValues(prev => {
-                          const next = { ...prev };
-                          delete next[key];
-                          return next;
-                        });
-                      }}
-                      className="w-24"
-                      inputMode="decimal"
-                      disabled={false}
-                    />
-                    <span>/</span>
-                    <Input readOnly value={100} className="w-24 bg-muted" />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={category.evenly_weighted}
-                        onCheckedChange={(v) =>
-                          setCategory(catIndex, (c) => ({
-                            ...c,
-                            evenly_weighted: v === true,
-                          }))
-                        }
-                      //   disabled={!whatIf}
-                      />
-                      <span className="text-sm">Evenly Weighted</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm whitespace-nowrap">Drop lowest:</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={category.drop_policy?.drop_count ?? 0}
-                        onChange={(e) => {
-                          const dropCount = Math.max(0, Math.floor(Number(e.target.value) || 0));
-                          setCategory(catIndex, (c) => ({
-                            ...c,
-                            drop_policy: dropCount > 0
-                              ? {
-                                  drop_count: dropCount,
-                                  drop_with: c.drop_policy?.drop_with,
-                                }
-                              : undefined,
-                          }));
-                        }}
-                        className="w-16"
-                        inputMode="numeric"
-                      />
-                    </div>
-                    {(category.drop_policy?.drop_count ?? 0) > 0 && (
-                      <div className="flex items-center gap-2">
-                        <Label className="text-sm whitespace-nowrap">Replace with:</Label>
-                        <Select
-                          value={
-                            category.drop_policy?.drop_with === undefined
-                              ? "drop"
-                              : category.drop_policy.drop_with.toString()
-                          }
-                          onValueChange={(value) => {
-                            setCategory(catIndex, (c) => ({
-                              ...c,
-                              drop_policy: c.drop_policy
-                                ? {
-                                    ...c.drop_policy,
-                                    drop_with: value === "drop" ? undefined : Number(value),
-                                  }
-                                : undefined,
-                            }));
-                          }}
-                        >
-                          <SelectTrigger className="w-[200px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="drop">Dropped completely</SelectItem>
-                            {(workingCourse.categories ?? [])
-                              .map((cat, idx) => ({ cat, idx }))
-                              .filter(({ idx }) => idx !== catIndex)
-                              .map(({ cat, idx }) => (
-                                <SelectItem key={idx} value={idx.toString()}>
-                                  Replaced with {cat.name}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    {(category.assignments ?? []).map((assignment, assignIndex) => (
-                      <div
-                        key={assignIndex}
-                        className="flex items-center gap-2 border border-border rounded-md px-3 py-2"
-                      >
-                        <Input
-                          type="text"
-                          value={inputValues[`score-${catIndex}-${assignIndex}`] ?? String(assignment.score)}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            const key = `score-${catIndex}-${assignIndex}`;
-                            // Allow empty, numbers, and decimal point
-                            if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
-                              // Store the string value for display
-                              setInputValues(prev => ({ ...prev, [key]: value }));
-                              // Update the actual value if it's a complete number
-                              if (value !== "" && value !== "." && !value.endsWith(".")) {
-                                const numValue = Number(value);
-                                if (!isNaN(numValue)) {
-                                  updateAssignment(catIndex, assignIndex, (a) => ({
-                                    ...a,
-                                    score: numValue,
-                                  }));
-                                }
-                              }
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const value = e.target.value;
-                            const key = `score-${catIndex}-${assignIndex}`;
-                            // On blur, ensure we have a valid number and clear the input value cache
-                            const numValue = value === "" || value === "." ? 0 : Number(value) || 0;
-                            updateAssignment(catIndex, assignIndex, (a) => ({
-                              ...a,
-                              score: numValue,
-                            }));
-                            setInputValues(prev => {
-                              const next = { ...prev };
-                              delete next[key];
-                              return next;
-                            });
-                          }}
-                          className="w-24"
-                          inputMode="decimal"
-                        />
-                        <span>/</span>
-                        <Input
-                          type="text"
-                          value={inputValues[`max_score-${catIndex}-${assignIndex}`] ?? String(assignment.max_score)}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            const key = `max_score-${catIndex}-${assignIndex}`;
-                            // Allow empty, numbers, and decimal point
-                            if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
-                              // Store the string value for display
-                              setInputValues(prev => ({ ...prev, [key]: value }));
-                              // Update the actual value if it's a complete number
-                              if (value !== "" && value !== "." && !value.endsWith(".")) {
-                                const numValue = Number(value);
-                                if (!isNaN(numValue)) {
-                                  updateAssignment(catIndex, assignIndex, (a) => ({
-                                    ...a,
-                                    max_score: Math.max(1, numValue),
-                                  }));
-                                }
-                              }
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const value = e.target.value;
-                            const key = `max_score-${catIndex}-${assignIndex}`;
-                            const numValue = value === "" || value === "." ? 1 : Math.max(1, Number(value) || 1);
-                            updateAssignment(catIndex, assignIndex, (a) => ({
-                              ...a,
-                              max_score: numValue,
-                            }));
-                            setInputValues(prev => {
-                              const next = { ...prev };
-                              delete next[key];
-                              return next;
-                            });
-                          }}
-                          className="w-24"
-                          inputMode="decimal"
-                        />
-                        <div className="ml-auto">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="group"
-                            onClick={() => removeAssignment(catIndex, assignIndex)}
-                            // disabled={!whatIf}
-                          >
-                            <Trash className="size-4 stroke-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => addAssignment(catIndex)}
-                    //   disabled={!whatIf}
-                    >
-                      <Plus className="size-4" />
-                      Add assignment
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <CategoryInputs
+                category={category}
+                catIndex={catIndex}
+                allCategories={workingCourse.categories ?? []}
+                inputValues={inputValues}
+                setInputValues={setInputValues}
+                onUpdateCategory={setCategory}
+                onUpdateAssignment={updateAssignment}
+                onAddAssignment={addAssignment}
+                onRemoveAssignment={removeAssignment}
+                categoryGrade={categoryGrade}
+                percentLabel={percentLabel}
+              />
             </AccordionContent>
           </AccordionItem>
         ))}
@@ -802,6 +607,16 @@ export function CourseCategories({
         open={isCategoryModalOpen}
         onOpenChange={setIsCategoryModalOpen}
         onCreate={handleAddCategory}
+      />
+      <PublishTemplateModal
+        open={isPublishModalOpen}
+        onOpenChange={setIsPublishModalOpen}
+        course={normalized}
+      />
+      <ImportTemplateModal
+        open={isImportModalOpen}
+        onOpenChange={setIsImportModalOpen}
+        onImport={handleImportTemplate}
       />
     </div>
   );

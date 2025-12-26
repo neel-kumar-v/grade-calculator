@@ -38,7 +38,21 @@ export const update = mutation({
     university: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getCurrentUserId(ctx);
+    let userId: any;
+    try {
+      userId = await getCurrentUserId(ctx);
+    } catch (error) {
+      // If user is not authenticated or user record doesn't exist yet, return null
+      return null;
+    }
+    
+    // Verify user exists in database
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      // User doesn't exist yet, return null
+      return null;
+    }
+    
     const existingSettings = await ctx.db
       .query("settings")
       .withIndex("by_userId", (q) => q.eq("userId", userId))

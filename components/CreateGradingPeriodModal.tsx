@@ -24,11 +24,13 @@ import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 interface CreateGradingPeriodModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: (gradingPeriodId: Id<"gradingPeriods">) => void | Promise<void>;
 }
 
 export function CreateGradingPeriodModal({
   open,
   onOpenChange,
+  onSuccess,
 }: CreateGradingPeriodModalProps) {
   const router = useRouter();
   const createGradingPeriod = useMutation(api.gradingPeriods.create);
@@ -51,7 +53,12 @@ export function CreateGradingPeriodModal({
       onOpenChange(false);
       setName("");
       setIsCompleted(false);
-      router.push(`/${gradingPeriodId as string}`);
+      
+      if (onSuccess) {
+        await onSuccess(gradingPeriodId);
+      } else {
+        router.push(`/${gradingPeriodId as string}`);
+      }
     } catch (error) {
       console.error("Failed to create grading period:", error);
     } finally {
