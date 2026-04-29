@@ -235,7 +235,7 @@ export default function TemplatePage({ params }: PageProps) {
 
   if (template === undefined) {
     return (
-      <div className="flex flex-col container max-w-3xl mx-auto py-16 gap-4">
+      <div className="flex flex-col container max-w-2xl mx-auto py-16 gap-4">
         <div>Loading template...</div>
       </div>
     );

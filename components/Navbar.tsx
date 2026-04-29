@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Authenticated, Unauthenticated, useQuery } from "convex/react";
-import { Scale, Weight } from "lucide-react";
+import { Weight } from "lucide-react";
 import { api } from "../convex/_generated/api";
 import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 import type { Id } from "../convex/_generated/dataModel";
@@ -265,6 +265,7 @@ export function Navbar() {
   } = useNavContext();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const showCourse =
     depth >= 1 &&
@@ -274,61 +275,108 @@ export function Navbar() {
     currentGradingPeriod !== null;
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur">
-      <div className="container max-w-screen-5xl mx-auto flex h-16 items-center justify-center px-4">
-        <NavigationMenu viewport={false} className="max-w-full">
-          <NavigationMenuList className="flex-wrap justify-start gap-2">
-            <NavigationMenuItem>
-              <NavigationMenuLink
-                asChild
-                className="hover:bg-transparent focus:bg-transparent flex flex-row items-center gap-2 font-semibold"
-              >
-                <Link href="/" className="relative">
-                  <Weight className="size-10 stroke-1 text-text" />
-                  <span className="absolute inset-0 top-2.5 flex items-center justify-center text-text font-bold text-[1em] leading-none">
-                    A<sup className="text-[0.8em] -translate-x-0.5 leading-none">+</sup>
-                  </span>
-                </Link>
-              </NavigationMenuLink>
-            </NavigationMenuItem>
+    <nav className="sticky top-0 z-50 border-b border-border bg-background">
+      <div className="container max-w-screen-5xl mx-auto h-16 px-4">
+        <div className="flex h-full items-center justify-between gap-3">
+          <div className="min-w-0 flex-1 overflow-visible">
+            <NavigationMenu viewport={false} className="max-w-full">
+              <NavigationMenuList className="flex-nowrap justify-start gap-2 whitespace-nowrap">
+                <NavigationMenuItem className="max-[360px]:hidden">
+                  <NavigationMenuLink
+                    asChild
+                    className="hover:bg-transparent focus:bg-transparent flex flex-row items-center gap-2 font-semibold"
+                  >
+                    <Link href="/" className="relative">
+                      <Weight className="size-10 stroke-1 text-text" />
+                      <span className="absolute inset-0 top-2.5 flex items-center justify-center text-text font-bold text-[1em] leading-none">
+                        A<sup className="text-[0.8em] -translate-x-0.5 leading-none">+</sup>
+                      </span>
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
 
-            <GradingPeriodNavItem
-              depth={depth}
-              gradingPeriodId={gradingPeriodId}
-              gradingPeriods={gradingPeriods}
-              currentGradingPeriod={currentGradingPeriod}
-            />
+                <GradingPeriodNavItem
+                  depth={depth}
+                  gradingPeriodId={gradingPeriodId}
+                  gradingPeriods={gradingPeriods}
+                  currentGradingPeriod={currentGradingPeriod}
+                />
 
-            {showCourse && (
-              <CourseNavItem
-                depth={depth}
-                gradingPeriodId={gradingPeriodId}
-                courseIndex={courseIndex}
-                currentGradingPeriod={currentGradingPeriod}
-              />
-            )}
-          </NavigationMenuList>
-        </NavigationMenu>
+                {showCourse && (
+                  <CourseNavItem
+                    depth={depth}
+                    gradingPeriodId={gradingPeriodId}
+                    courseIndex={courseIndex}
+                    currentGradingPeriod={currentGradingPeriod}
+                  />
+                )}
+              </NavigationMenuList>
+            </NavigationMenu>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <Authenticated>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSettingsOpen(true)}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border hover:bg-accent"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              aria-expanded={menuOpen}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
             >
-              <Settings className="h-5 w-5" />
-            </Button>
-          </Authenticated>
-          <ThemeToggle />
-          <Unauthenticated>
-            <Button variant="outline" asChild>
-              <Link href="/">Sign In</Link>
-            </Button>
-          </Unauthenticated>
-          <Authenticated>
-            <SignOut variant="ghost" />
-          </Authenticated>
+              <span className="relative block h-5 w-5">
+                <span
+                  className={`absolute left-0 top-1 h-0.5 w-5 rounded bg-foreground transition-all duration-200 ${
+                    menuOpen ? "top-2.5 rotate-45" : ""
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 top-2.5 h-0.5 w-5 rounded bg-foreground transition-all duration-200 ${
+                    menuOpen ? "opacity-0" : ""
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 h-0.5 w-5 rounded bg-foreground transition-all duration-200 ${
+                    menuOpen ? "top-2.5 -rotate-45" : "top-4"
+                  }`}
+                />
+              </span>
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 top-12 z-50 min-w-44 rounded-md border border-border bg-background p-2 shadow-md">
+                <Authenticated>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setSettingsOpen(true);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <Settings className="h-4 w-4" />
+                    Settings
+                  </Button>
+                </Authenticated>
+                <ThemeToggle menuStyle className="w-full justify-start" />
+                <Unauthenticated>
+                  <Button
+                    variant="outline"
+                    asChild
+                    className="w-full justify-start"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    <Link href="/">Sign In</Link>
+                  </Button>
+                </Unauthenticated>
+                <Authenticated>
+                  <SignOut
+                    variant="ghost"
+                    className="w-full justify-start"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                </Authenticated>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <Authenticated>

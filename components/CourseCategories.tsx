@@ -25,7 +25,7 @@ import { CreateCategoryModal } from "./CreateCategoryModal";
 import { PublishTemplateModal } from "./templates/PublishTemplateModal";
 import { ImportTemplateModal } from "./templates/ImportTemplateModal";
 import { CategoryInputs, renderCategoryGradeDisplay } from "./CategoryInputs";
-import { Plus, Trash, TriangleAlert, Download, Upload } from "lucide-react";
+import { Plus, Pencil, TriangleAlert, Download, Upload } from "lucide-react";
 
 type GradingPeriod = Doc<"gradingPeriods">;
 type Course = GradingPeriod["courses"][number];
@@ -162,6 +162,7 @@ export function CourseCategories({
   const [draftCourse, setDraftCourse] = useState<Course | null>(null);
   const [liveCourse, setLiveCourse] = useState<Course>(() => normalizeCourse(course));
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState<number | null>(null);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   // Track input string values for decimal inputs
@@ -309,6 +310,35 @@ export function CourseCategories({
     }
   };
 
+  const handleEditCategory = (catIndex: number, editedCategory: Category) => {
+    if (whatIf) {
+      setDraftCourse((prev) => {
+        if (!prev) return prev;
+        const categories = [...(prev.categories ?? [])];
+        if (!categories[catIndex]) return prev;
+        const nextCategory = {
+          ...editedCategory,
+          grade: editedCategory.manual ? editedCategory.grade : categoryGrade(editedCategory, categories) * 100,
+        };
+        categories[catIndex] = nextCategory;
+        return { ...prev, categories };
+      });
+    } else {
+      setLiveCourse((prev) => {
+        const categories = [...(prev.categories ?? [])];
+        if (!categories[catIndex]) return prev;
+        const nextCategory = {
+          ...editedCategory,
+          grade: editedCategory.manual ? editedCategory.grade : categoryGrade(editedCategory, categories) * 100,
+        };
+        categories[catIndex] = nextCategory;
+        const next = { ...prev, categories };
+        updateLocalAndPersist(next);
+        return next;
+      });
+    }
+  };
+
   const handleSave = async () => {
     if (!draftCourse) return;
     const normalizedCourse = normalizeForSave(draftCourse);
@@ -371,6 +401,13 @@ export function CourseCategories({
     }
   };
 
+  const handleCategoryModalOpenChange = (open: boolean) => {
+    setIsCategoryModalOpen(open);
+    if (!open) {
+      setSelectedCategoryIndex(null);
+    }
+  };
+
   const renderCategoryGrade = (cat: Category, idx: number) => {
     const actual = categoryGrade(normalized.categories?.[idx] ?? cat, normalized.categories ?? []);
     const sim = whatIf && draftCourse ? categoryGrade(cat, draftCourse.categories ?? []) : null;
@@ -395,7 +432,7 @@ export function CourseCategories({
 
   return (
     <div className="container max-w-2xl  mx-auto py-12 px-6 flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">{normalized.name}</h1>
           <p className="text-sm text-muted-foreground">
@@ -403,28 +440,33 @@ export function CourseCategories({
           </p>
         </div>
         {!normalized.manual && (
-          <div className="flex items-center gap-2">
-            {!whatIf && <label className="flex items-center gap-2 text-sm">
+          <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:items-center">
+            {!whatIf && <label className="flex w-full items-center gap-2 text-sm sm:w-auto">
               <Button
                 variant={whatIf ? "default" : "outline"}
                 onClick={toggleWhatIf}
                 type="button"
+                className="w-full sm:w-auto"
               >
                 What-if mode
               </Button>
             </label>}
             {whatIf && (
               <>
-                <Button variant="outline" onClick={handleCancel}>
+                <Button variant="outline" onClick={handleCancel} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button variant="outline" onClick={handleSave}>Save changes</Button>
+                <Button variant="outline" onClick={handleSave} className="w-full sm:w-auto">Save changes</Button>
               </>
             )}
             <Button
               variant="outline"
-              onClick={() => setIsCategoryModalOpen(true)}
+              onClick={() => {
+                setSelectedCategoryIndex(null);
+                setIsCategoryModalOpen(true);
+              }}
               type="button"
+              className="w-full sm:w-auto"
             >
               <Plus className="size-4" />
               Add Category
@@ -434,6 +476,7 @@ export function CourseCategories({
                 variant="default"
                 onClick={() => setIsImportModalOpen(true)}
                 type="button"
+                className="w-full sm:w-auto"
               >
                 <Download className="size-4" />
                 Import Template
@@ -443,6 +486,7 @@ export function CourseCategories({
                 variant="default"
                 onClick={() => setIsPublishModalOpen(true)}
                 type="button"
+                className="w-full sm:w-auto"
               >
                 <Upload className="size-4" />
                 Publish Template
@@ -485,15 +529,16 @@ export function CourseCategories({
               <Button
                 variant="ghost"
                 size="icon"
-                title="Remove category"
+                title="Edit category"
                 fakeButton
                 className="absolute left-0 -translate-x-10 opacity-0 group-hover:opacity-100 duration-100 group-hover:duration-0 transition-opacity z-10 cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  removeCategory(catIndex);
+                  setSelectedCategoryIndex(catIndex);
+                  setIsCategoryModalOpen(true);
                 }}
               >
-                <Trash className="size-4 stroke-destructive" />
+                <Pencil className="size-4" />
               </Button>
               <div className="flex w-full items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -648,8 +693,21 @@ export function CourseCategories({
 
       <CreateCategoryModal
         open={isCategoryModalOpen}
-        onOpenChange={setIsCategoryModalOpen}
+        onOpenChange={handleCategoryModalOpenChange}
         onCreate={handleAddCategory}
+        editingCategory={
+          selectedCategoryIndex !== null
+            ? (workingCourse.categories ?? [])[selectedCategoryIndex]
+            : undefined
+        }
+        onSave={(category) => {
+          if (selectedCategoryIndex === null) return;
+          handleEditCategory(selectedCategoryIndex, category);
+        }}
+        onDelete={() => {
+          if (selectedCategoryIndex === null) return;
+          removeCategory(selectedCategoryIndex);
+        }}
       />
       <PublishTemplateModal
         open={isPublishModalOpen}
@@ -664,5 +722,3 @@ export function CourseCategories({
     </div>
   );
 }
-
-

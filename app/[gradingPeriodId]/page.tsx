@@ -28,7 +28,7 @@ export default function GradingPeriodPage({ params }: PageProps) {
 
   if (gradingPeriod === undefined) {
     return (
-      <div className="flex flex-col container max-w-3xl  mx-auto py-12 gap-4 w-full">
+      <div className="flex flex-col container max-w-2xl  mx-auto py-12 gap-4 w-full">
         <div>Loading...</div>
       </div>
     );

@@ -91,7 +91,7 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   };
 
   return (
-    <div className="flex flex-col gap-4 w-full container max-w-3xl px-6 mx-auto py-12">
+    <div className="flex flex-col gap-4 w-full container max-w-2xl px-6 mx-auto py-12">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{gradingPeriod.name}</h1>
         <Button onClick={() => setIsCourseModalOpen(true)}>

@@ -43,7 +43,7 @@ export default function CoursePage({ params }: PageProps) {
 
   if (data === undefined) {
     return (
-    <div className="flex flex-col container max-w-3xl  mx-auto py-16 gap-4">
+      <div className="flex flex-col container max-w-2xl  mx-auto py-16 gap-4">
       <div>Loading course...</div>
     </div>
   );

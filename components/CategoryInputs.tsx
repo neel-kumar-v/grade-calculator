@@ -292,10 +292,54 @@ export function CategoryInputs({
         <Button
           type="button"
           variant="outline"
-          onClick={() => onAddAssignment(catIndex)}
+          className="w-full justify-center gap-2"
+          onClick={() => {
+            const rawCount = inputValues[`add-count-${catIndex}`] ?? "1";
+            const parsedCount = Math.floor(Number(rawCount) || 1);
+            const count = Math.max(1, Math.min(100, parsedCount));
+            for (let i = 0; i < count; i += 1) {
+              onAddAssignment(catIndex);
+            }
+            setInputValues((prev) => ({
+              ...prev,
+              [`add-count-${catIndex}`]: "1",
+            }));
+          }}
         >
           <Plus className="size-4" />
-          Add assignment
+          <span>Add</span>
+          <Input
+            type="number"
+            min="1"
+            step="1"
+            value={inputValues[`add-count-${catIndex}`] ?? "1"}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const value = e.target.value;
+              const key = `add-count-${catIndex}`;
+              if (value === "" || /^\d+$/.test(value)) {
+                setInputValues((prev) => ({ ...prev, [key]: value }));
+              }
+              className="w-4 max-w-4"
+            }}
+            onBlur={(e) => {
+              const key = `add-count-${catIndex}`;
+              const parsed = Math.floor(Number(e.target.value) || 1);
+              const clamped = Math.max(1, parsed);
+              setInputValues((prev) => ({ ...prev, [key]: String(clamped) }));
+            }}
+            className="h-7 w-12 bg-background text-center"
+            inputMode="numeric"
+            aria-label="Number of assignments to add"
+          />
+          <span>
+            {(Math.max(
+              1,
+              Math.floor(Number(inputValues[`add-count-${catIndex}`] ?? "1") || 1)
+            ) === 1)
+              ? "assignment"
+              : "assignments"}
+          </span>
         </Button>
       </div>
     </div>

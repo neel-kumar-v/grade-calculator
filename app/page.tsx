@@ -48,7 +48,7 @@ export default function Home() {
 
 
   return (
-    <main className={`flex min-h-[90vh] container max-w-3xl  mx-auto flex-col px-6 bg-background ${isAuthenticated ? 'items-start justify-start' : 'items-center justify-center'}`}>
+    <main className={`flex min-h-[90vh] container max-w-2xl  mx-auto flex-col px-6 bg-background ${isAuthenticated ? 'items-start justify-start' : 'items-center justify-center'}`}>
       <AuthLoading>Loading... </AuthLoading>
       <Unauthenticated>
         <UnauthWrapper setIsAuthenticated={setIsAuthenticated}>

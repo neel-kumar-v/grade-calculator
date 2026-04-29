@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
+import { Trash } from "lucide-react";
 import type { Doc } from "../convex/_generated/dataModel";
 
 type GradingPeriod = Doc<"gradingPeriods">;
@@ -23,13 +24,20 @@ interface CreateCategoryModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreate: (category: Category) => void;
+  editingCategory?: Category;
+  onSave?: (category: Category) => void;
+  onDelete?: () => void;
 }
 
 export function CreateCategoryModal({
   open,
   onOpenChange,
   onCreate,
+  editingCategory,
+  onSave,
+  onDelete,
 }: CreateCategoryModalProps) {
+  const isEditMode = editingCategory !== undefined;
   const [name, setName] = useState("");
   const [weight, setWeight] = useState<number>(10);
   const [extraCredit, setExtraCredit] = useState(false);
@@ -50,6 +58,24 @@ export function CreateCategoryModal({
     setDropCount(0);
   };
 
+  useEffect(() => {
+    if (!open) return;
+
+    if (isEditMode && editingCategory) {
+      setName(editingCategory.name);
+      setWeight(editingCategory.weight);
+      setExtraCredit(editingCategory.extra_credit);
+      setManual(editingCategory.manual);
+      setEvenlyWeighted(editingCategory.evenly_weighted);
+      setManualScore(editingCategory.manual ? editingCategory.grade : 100);
+      setManualScoreInput("");
+      setDropCount(editingCategory.drop_policy?.drop_count ?? 0);
+      return;
+    }
+
+    reset();
+  }, [open, isEditMode, editingCategory]);
+
   const handleClose = () => {
     reset();
     onOpenChange(false);
@@ -60,7 +86,7 @@ export function CreateCategoryModal({
     if (!name.trim()) return;
     if (weight <= 0) return;
 
-    const gradeValue = manual ? (manualScore / 100) * 100 : 0; // store as 0-100 number
+    const gradeValue = manual ? manualScore : 0;
 
     const base: Category = {
       name: name.trim(),
@@ -69,17 +95,17 @@ export function CreateCategoryModal({
       extra_credit: extraCredit,
       manual,
       grade: gradeValue,
-      drop_policy: dropCount > 0
-        ? {
-            drop_count: dropCount,
-            drop_with: undefined, // Will be set later when editing if needed
-          }
-        : undefined,
-      // for manual categories we omit assignments; for auto we seed with one assignment
+      drop_policy:
+        dropCount > 0
+          ? {
+              drop_count: dropCount,
+              drop_with: isEditMode ? editingCategory?.drop_policy?.drop_with : undefined,
+            }
+          : undefined,
       ...(manual
         ? {}
         : {
-            assignments: [
+            assignments: (isEditMode ? editingCategory?.assignments : undefined) ?? [
               {
                 score: 0,
                 max_score: 100,
@@ -88,7 +114,12 @@ export function CreateCategoryModal({
           }),
     };
 
-    onCreate(base);
+    if (isEditMode) {
+      onSave?.(base);
+    } else {
+      onCreate(base);
+    }
+
     handleClose();
   };
 
@@ -96,9 +127,11 @@ export function CreateCategoryModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Category</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Category" : "Add Category"}</DialogTitle>
           <DialogDescription>
-            Define how this category contributes to your course grade.
+            {isEditMode
+              ? "Edit how this category contributes to your course grade."
+              : "Define how this category contributes to your course grade."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -136,10 +169,7 @@ export function CreateCategoryModal({
             </label>
 
             <label className="flex items-center gap-2">
-              <Checkbox
-                checked={manual}
-                onCheckedChange={(v) => setManual(v === true)}
-              />
+              <Checkbox checked={manual} onCheckedChange={(v) => setManual(v === true)} />
               <span className="text-sm">Manually set category grade</span>
             </label>
           </div>
@@ -153,11 +183,8 @@ export function CreateCategoryModal({
                   value={manualScoreInput || String(manualScore)}
                   onChange={(e) => {
                     const value = e.target.value;
-                    // Allow empty, numbers, and decimal point
                     if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
-                      // Store the string value for display
                       setManualScoreInput(value);
-                      // Update the actual value if it's a complete number
                       if (value !== "" && value !== "." && !value.endsWith(".")) {
                         const numValue = Number(value);
                         if (!isNaN(numValue) && numValue >= 0) {
@@ -206,23 +233,37 @@ export function CreateCategoryModal({
                 />
                 {dropCount > 0 && (
                   <span className="text-xs text-muted-foreground">
-                    (Will drop completely; can change replacement policy when editing)
+                    (Replacement policy can be configured in category settings)
                   </span>
                 )}
               </div>
             </div>
           )}
 
-          <DialogFooter className="mt-4">
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button type="submit">Create Category</Button>
+          <DialogFooter className="mt-4 flex items-center justify-between">
+            {isEditMode && onDelete && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  onDelete();
+                  handleClose();
+                }}
+                className="mr-auto"
+              >
+                <Trash className="size-4" />
+                Delete Category
+              </Button>
+            )}
+            <div className="ml-auto flex gap-2">
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button type="submit">{isEditMode ? "Save Edits" : "Create Category"}</Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   );
 }
-
-

@@ -249,7 +249,7 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
   }
 
   return (
-    <div className="flex flex-col gap-4 w-full container max-w-3xl mx-auto py-12">
+    <div className="flex flex-col gap-4 w-full container max-w-2xl mx-auto py-12">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Your {gradingPeriodName}</h1>
         <Button onClick={() => setIsModalOpen(true)}>
