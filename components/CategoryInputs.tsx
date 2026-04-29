@@ -320,7 +320,6 @@ export function CategoryInputs({
               if (value === "" || /^\d+$/.test(value)) {
                 setInputValues((prev) => ({ ...prev, [key]: value }));
               }
-              className="w-4 max-w-4"
             }}
             onBlur={(e) => {
               const key = `add-count-${catIndex}`;
