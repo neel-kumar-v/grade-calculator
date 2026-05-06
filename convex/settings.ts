@@ -1,10 +1,15 @@
 import { query, mutation } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { auth } from "./auth";
 import { api } from "./_generated/api";
 import { getScaleByName, calculateGPA } from "../lib/gpa";
 
-async function getCurrentUserId(ctx: any) {
+type ConvexCtx = QueryCtx | MutationCtx;
+type CourseDoc = Doc<"gradingPeriods">["courses"][number];
+
+async function getCurrentUserId(ctx: ConvexCtx) {
   const userId = await auth.getUserId(ctx);
   if (!userId) {
     throw new Error("Unauthenticated");
@@ -19,7 +24,7 @@ export const get = query({
       const userId = await getCurrentUserId(ctx);
       const settings = await ctx.db
         .query("settings")
-        .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
         .first();
 
       return settings || null;
@@ -38,7 +43,7 @@ export const update = mutation({
     university: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    let userId: any;
+    let userId: Id<"users">;
     try {
       userId = await getCurrentUserId(ctx);
     } catch (error) {
@@ -58,7 +63,9 @@ export const update = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
 
-    const updateData: any = {};
+    const updateData: Partial<
+      Pick<Doc<"settings">, "gradingPeriodName" | "gpaScale" | "customScale" | "university">
+    > = {};
     if (args.gradingPeriodName !== undefined) updateData.gradingPeriodName = args.gradingPeriodName;
     if (args.gpaScale !== undefined) updateData.gpaScale = args.gpaScale;
     if (args.customScale !== undefined) updateData.customScale = args.customScale;
@@ -107,7 +114,7 @@ export const recalculateAllGPAs = mutation({
       const scale = getScaleByName(settings.gpaScale, settings.customScale);
       
       // Recalculate GPA for all courses
-      const coursesWithGPA = gradingPeriod.courses.map((course: any) => {
+      const coursesWithGPA: CourseDoc[] = gradingPeriod.courses.map((course) => {
         if (typeof course.grade === "number" && course.grade > 0) {
           return {
             ...course,

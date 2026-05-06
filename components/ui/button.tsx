@@ -49,32 +49,40 @@ function Button({
     asChild?: boolean
     fakeButton?: boolean
   }) {
-  const Comp = fakeButton ? "div" : (asChild ? Slot : "button")
-
-  const handleKeyDown = fakeButton && onClick
-    ? (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick(e as any);
-        }
+  if (fakeButton) {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if ((e.key === "Enter" || e.key === " ") && onClick) {
+        e.preventDefault();
+        onClick(e as unknown as React.MouseEvent<HTMLButtonElement>);
       }
-    : undefined;
+    };
 
+    return (
+      <div
+        data-slot="button"
+        data-variant={variant}
+        data-size={size}
+        role="button"
+        tabIndex={0}
+        onClick={onClick as React.MouseEventHandler<HTMLDivElement> | undefined}
+        onKeyDown={handleKeyDown}
+        className={cn(buttonVariants({ variant, size, className }))}
+        {...(props as React.HTMLAttributes<HTMLDivElement>)}
+      />
+    );
+  }
+
+  const Comp = asChild ? Slot : "button";
   return (
     <Comp
-      {...({
-        "data-slot": "button",
-        "data-variant": variant,
-        "data-size": size,
-        role: fakeButton ? "button" : undefined,
-        tabIndex: fakeButton ? 0 : undefined,
-        onClick,
-        onKeyDown: handleKeyDown,
-        className: cn(buttonVariants({ variant, size, className })),
-        ...props,
-      } as any)}
+      data-slot="button"
+      data-variant={variant}
+      data-size={size}
+      onClick={onClick}
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
     />
-  )
+  );
 }
 
 export { Button, buttonVariants }

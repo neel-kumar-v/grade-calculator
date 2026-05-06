@@ -168,7 +168,7 @@ export function CreateGradingPeriodModal({
                   <TooltipContent>
                     <p>
                       Check this if this {gradingPeriodName.toLowerCase().slice(0, -1)} has already ended and
-                      you're entering historical grades.
+                      you&apos;re entering historical grades.
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -204,4 +204,3 @@ export function CreateGradingPeriodModal({
     </Dialog>
   );
 }
-

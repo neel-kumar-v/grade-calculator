@@ -41,16 +41,17 @@ export function TemplateSignupCTA() {
           if (templateInfo.university && (!settings?.university || settings.university !== templateInfo.university)) {
             let retries = 3;
             let success = false;
-            while (retries > 0 && !success) {
-              try {
-                await updateSettings({ university: templateInfo.university });
-                success = true;
-              } catch (error: any) {
-                // If it's a null _id error, wait and retry
-                if (error?.message?.includes("_id") || error?.message?.includes("null")) {
-                  retries--;
-                  if (retries > 0) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
+              while (retries > 0 && !success) {
+                try {
+                  await updateSettings({ university: templateInfo.university });
+                  success = true;
+                } catch (error: unknown) {
+                  // If it's a null _id error, wait and retry
+                  const message = error instanceof Error ? error.message : "";
+                  if (message.includes("_id") || message.includes("null")) {
+                    retries--;
+                    if (retries > 0) {
+                      await new Promise(resolve => setTimeout(resolve, 500));
                   }
                 } else {
                   // Other errors, don't retry
@@ -125,7 +126,7 @@ export function TemplateSignupCTA() {
                 {/* <p className="text-sm text-muted-foreground">
                   Sign up to save your grades
                 </p> */}
-                <Button variant="outline">I'd rather forget 😭</Button>
+                <Button variant="outline">I&apos;d rather forget 😭</Button>
                 <Button onClick={handleSaveGrades}>Save Grades</Button>
               </div>
             </CardContent>
@@ -143,4 +144,3 @@ export function TemplateSignupCTA() {
     </>
   );
 }
-

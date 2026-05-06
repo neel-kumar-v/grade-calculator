@@ -22,7 +22,7 @@ export function PasswordReset() {
       <CardHeader>
         <CardTitle>Reset Password</CardTitle>
         <CardDescription>
-          Enter your email address and we'll send you a verification code
+          Enter your email address and we&apos;ll send you a verification code
         </CardDescription>
       </CardHeader>
       <form

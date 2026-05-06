@@ -41,26 +41,32 @@ interface CourseCategoriesProps {
   course: Course;
 }
 
+function toPercentGrade(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "score" in value &&
+    "max_score" in value &&
+    typeof value.score === "number" &&
+    typeof value.max_score === "number" &&
+    value.max_score > 0
+  ) {
+    return (value.score / value.max_score) * 100;
+  }
+  return 0;
+}
+
 function normalizeCourse(course: Course): Course {
   const categories: Category[] = (course.categories ?? []).map((cat) => {
-    const gradeVal =
-      typeof cat.grade === "number"
-        ? cat.grade
-        : (cat as any)?.grade?.max_score
-          ? ((cat as any).grade.score / (cat as any).grade.max_score) * 100
-          : 0;
+    const gradeVal = toPercentGrade(cat.grade);
     return {
       ...(cat as Category),
       assignments: (cat.assignments ?? []) as Assignment[],
       grade: gradeVal,
     };
   });
-  const courseGrade =
-    typeof course.grade === "number"
-      ? course.grade
-      : (course as any)?.grade?.max_score
-        ? ((course as any).grade.score / (course as any).grade.max_score) * 100
-        : 0;
+  const courseGrade = toPercentGrade(course.grade);
   return {
     ...course,
     grade: courseGrade,
@@ -245,10 +251,10 @@ export function CourseCategories({
   const addAssignment = (catIndex: number) => {
     setCategory(catIndex, (c) => ({
       ...c,
-      assignments: [...(c.assignments ?? []), { score: 0, max_score: 100 }],
+      assignments: [...(c.assignments ?? []), { score: 100, max_score: 100 }],
       grade: categoryGrade({
         ...c,
-        assignments: [...(c.assignments ?? []), { score: 0, max_score: 100 }],
+        assignments: [...(c.assignments ?? []), { score: 100, max_score: 100 }],
       }, workingCourse.categories ?? []) * 100,
     }));
   };

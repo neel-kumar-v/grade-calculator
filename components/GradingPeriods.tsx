@@ -7,7 +7,7 @@ import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
 import { CreateGradingPeriodModal } from "./CreateGradingPeriodModal";
 import type { Doc, Id } from "../convex/_generated/dataModel";
-import { getScaleByName, calculateGPA, SCALE_NAMES } from "../lib/gpa";
+import { getScaleByName, calculateGPA } from "../lib/gpa";
 import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 
 interface GradingPeriodsProps {
@@ -126,9 +126,8 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
   };
 
   const scale = useMemo(() => {
-    if (!settings || !("gpaScale" in settings)) return getScaleByName("STANDARD_4_0");
-    const settingsDoc = settings as any;
-    return getScaleByName(settingsDoc.gpaScale, settingsDoc.customScale);
+    if (!settings) return getScaleByName("STANDARD_4_0");
+    return getScaleByName(settings.gpaScale, settings.customScale);
   }, [settings]);
 
   const isWAM = scale === "WAM";

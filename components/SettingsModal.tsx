@@ -49,13 +49,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     
     if (settings !== null) {
       // Settings exist, load them
-      const settingsDoc = settings as any;
       if (!isInitialized) {
-        setGradingPeriodName(settingsDoc.gradingPeriodName || "Semesters");
-        setGpaScale(settingsDoc.gpaScale || "STANDARD_4_0");
-        setCustomScale(settingsDoc.customScale || []);
-        setUniversity(settingsDoc.university || "");
-        previousGpaScaleRef.current = settingsDoc.gpaScale || "STANDARD_4_0";
+        setGradingPeriodName(settings.gradingPeriodName || "Semesters");
+        setGpaScale(settings.gpaScale || "STANDARD_4_0");
+        setCustomScale(settings.customScale || []);
+        setUniversity(settings.university || "");
+        previousGpaScaleRef.current = settings.gpaScale || "STANDARD_4_0";
         setIsInitialized(true);
       }
     } else if (settings === null && !isInitialized && open) {
@@ -265,7 +264,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               <div className="p-4 border border-border rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">
                   WAM (Weighted Average Marks) uses your raw percentage grades without GPA conversion. 
-                  All GPA labels will be replaced with "WAM" throughout the application.
+                  All GPA labels will be replaced with &quot;WAM&quot; throughout the application.
                 </p>
               </div>
             ) : currentScale !== "WAM" && Array.isArray(currentScale) ? (
@@ -377,4 +376,3 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     </Dialog>
   );
 }
-

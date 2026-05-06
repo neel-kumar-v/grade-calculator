@@ -21,25 +21,32 @@ export default function CoursePage({ params }: PageProps) {
   const { gradingPeriodId, courseIndex } = use(params);
   const gradingPeriodIdTyped = gradingPeriodId as Id<"gradingPeriods">;
   const index = Number(courseIndex);
+  const isValidIndex = Number.isFinite(index) && index >= 0;
 
-  if (!Number.isFinite(index) || index < 0) {
-    return <NotFound />;
-  }
+  const data = useQuery(
+    api.gradingPeriods.getCourseById,
+    isValidIndex
+      ? {
+          gradingPeriodId: gradingPeriodIdTyped,
+          courseIndex: index,
+        }
+      : "skip"
+  );
 
-  const data = useQuery(api.gradingPeriods.getCourseById, {
-    gradingPeriodId: gradingPeriodIdTyped,
-    courseIndex: index,
-  });
-
-  const gradingPeriod = useQuery(api.gradingPeriods.getById, {
-    id: gradingPeriodIdTyped,
-  });
+  const gradingPeriod = useQuery(
+    api.gradingPeriods.getById,
+    isValidIndex ? { id: gradingPeriodIdTyped } : "skip"
+  );
 
   useEffect(() => {
     if (data?.course && gradingPeriod) {
       document.title = `${data.course.name} (${gradingPeriod.name}) - Heavyweight`;
     }
   }, [data, gradingPeriod]);
+
+  if (!isValidIndex) {
+    return <NotFound />;
+  }
 
   if (data === undefined) {
     return (
@@ -61,5 +68,4 @@ export default function CoursePage({ params }: PageProps) {
     />
   );
 }
-
 

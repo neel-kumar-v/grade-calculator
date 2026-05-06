@@ -131,7 +131,7 @@ export function PublishTemplateModal({
         return {
           ...categoryData,
           grade: 0, // Reset grade
-          assignments: cat.manual ? undefined : [{ score: 0, max_score: 100 }], // Reset assignments
+          assignments: cat.manual ? undefined : [{ score: 100, max_score: 100 }], // Reset assignments
         } as Category;
       });
 

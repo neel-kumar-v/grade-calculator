@@ -1,10 +1,15 @@
 import { query, mutation } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { auth } from "./auth";
-import schema, { gradingPeriodInput, course } from "./schema";
+import { gradingPeriodInput, course } from "./schema";
 import { getScaleByName, calculateGPA } from "../lib/gpa";
 
-async function getCurrentUserId(ctx: any) {
+type ConvexCtx = QueryCtx | MutationCtx;
+type CourseDoc = Doc<"gradingPeriods">["courses"][number];
+
+async function getCurrentUserId(ctx: ConvexCtx) {
   const userId = await auth.getUserId(ctx);
   if (!userId) {
     throw new Error("Unauthenticated");
@@ -13,12 +18,12 @@ async function getCurrentUserId(ctx: any) {
 }
 
 // Get user settings and return the GPA scale
-async function getUserGPAScale(ctx: any): Promise<ReturnType<typeof getScaleByName>> {
+async function getUserGPAScale(ctx: ConvexCtx): Promise<ReturnType<typeof getScaleByName>> {
   try {
     const userId = await getCurrentUserId(ctx);
     const settings = await ctx.db
       .query("settings")
-      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
 
     if (settings) {
@@ -32,7 +37,7 @@ async function getUserGPAScale(ctx: any): Promise<ReturnType<typeof getScaleByNa
 }
 
 // Convert percentage (0-100) to GPA using user's scale
-async function percentageToGPA(ctx: any, percentage: number): Promise<number> {
+async function percentageToGPA(ctx: ConvexCtx, percentage: number): Promise<number> {
   const scale = await getUserGPAScale(ctx);
   return calculateGPA(percentage, scale);
 }
@@ -155,7 +160,7 @@ export const getCourseById = query({
 
 // Calculate weighted average grade for courses
 // Using any[] since we're working with runtime data from the database
-function calculateGradingPeriodGrade(courses: any[]): number {
+function calculateGradingPeriodGrade(courses: CourseDoc[]): number {
   let totalWeightedGrade = 0;
   let totalCredits = 0;
 
@@ -171,7 +176,7 @@ function calculateGradingPeriodGrade(courses: any[]): number {
 }
 
 // Calculate weighted average grade for core courses only
-function calculateCoreGrade(courses: any[]): number {
+function calculateCoreGrade(courses: CourseDoc[]): number {
   let totalWeightedGrade = 0;
   let totalCredits = 0;
 
@@ -187,7 +192,7 @@ function calculateCoreGrade(courses: any[]): number {
 }
 
 // Calculate weighted average GPA for courses
-async function calculateGradingPeriodGPA(ctx: any, courses: any[]): Promise<number | null> {
+async function calculateGradingPeriodGPA(ctx: ConvexCtx, courses: CourseDoc[]): Promise<number | null> {
   const scale = await getUserGPAScale(ctx);
   let totalWeightedGPA = 0;
   let totalCredits = 0;
@@ -205,7 +210,7 @@ async function calculateGradingPeriodGPA(ctx: any, courses: any[]): Promise<numb
 }
 
 // Calculate weighted average GPA for core courses only
-async function calculateCoreGPA(ctx: any, courses: any[]): Promise<number | null> {
+async function calculateCoreGPA(ctx: ConvexCtx, courses: CourseDoc[]): Promise<number | null> {
   const scale = await getUserGPAScale(ctx);
   let totalWeightedGPA = 0;
   let totalCredits = 0;
@@ -223,7 +228,7 @@ async function calculateCoreGPA(ctx: any, courses: any[]): Promise<number | null
 }
 
 // Calculate and set GPA for a course
-async function calculateCourseGPA(ctx: any, course: any): Promise<any> {
+async function calculateCourseGPA(ctx: ConvexCtx, course: CourseDoc): Promise<CourseDoc> {
   const scale = await getUserGPAScale(ctx);
   if (typeof course.grade === "number" && course.grade > 0) {
     return {
@@ -238,7 +243,7 @@ async function calculateCourseGPA(ctx: any, course: any): Promise<any> {
 }
 
 // Calculate and set GPA for all courses in an array
-async function calculateCoursesGPA(ctx: any, courses: any[]): Promise<any[]> {
+async function calculateCoursesGPA(ctx: ConvexCtx, courses: CourseDoc[]): Promise<CourseDoc[]> {
   const results = await Promise.all(courses.map(course => calculateCourseGPA(ctx, course)));
   return results;
 }
@@ -262,7 +267,9 @@ export const update = mutation({
       throw new Error("Unauthorized: You can only update your own gradingPeriods");
     }
 
-    const updateData: any = {};
+    const updateData: Partial<
+      Pick<Doc<"gradingPeriods">, "name" | "isCompleted" | "courses" | "grade" | "core_grade" | "gpa" | "core_gpa">
+    > = {};
     if (args.name !== undefined) updateData.name = args.name;
     if (args.isCompleted !== undefined) updateData.isCompleted = args.isCompleted;
     if (args.courses !== undefined) {
@@ -272,8 +279,8 @@ export const update = mutation({
       // Recalculate grades and GPAs when courses are updated
       updateData.grade = calculateGradingPeriodGrade(coursesWithGPA);
       updateData.core_grade = calculateCoreGrade(coursesWithGPA);
-      updateData.gpa = await calculateGradingPeriodGPA(ctx, coursesWithGPA);
-      updateData.core_gpa = await calculateCoreGPA(ctx, coursesWithGPA);
+      updateData.gpa = (await calculateGradingPeriodGPA(ctx, coursesWithGPA)) ?? undefined;
+      updateData.core_gpa = (await calculateCoreGPA(ctx, coursesWithGPA)) ?? undefined;
     }
 
     await ctx.db.patch(args.id, updateData);

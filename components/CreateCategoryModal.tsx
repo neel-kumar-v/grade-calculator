@@ -107,7 +107,7 @@ export function CreateCategoryModal({
         : {
             assignments: (isEditMode ? editingCategory?.assignments : undefined) ?? [
               {
-                score: 0,
+                score: 100,
                 max_score: 100,
               },
             ],

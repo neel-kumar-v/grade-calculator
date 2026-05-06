@@ -29,9 +29,9 @@ interface NavContext {
   gradingPeriods:
     | ReturnType<typeof useQuery<typeof api.gradingPeriods.get>>
     | undefined;
-  // When there is a gradingPeriodId this is the result of getById,
-  // otherwise it may be the result of get (but is never used in that case).
-  currentGradingPeriod: any;
+  currentGradingPeriod:
+    | ReturnType<typeof useQuery<typeof api.gradingPeriods.getById>>
+    | undefined;
 }
 
 function useNavContext(): NavContext {
@@ -52,15 +52,11 @@ function useNavContext(): NavContext {
 
   const gradingPeriods = useQuery(api.gradingPeriods.get, {});
 
-  // Always call hooks in the same order on every render.
-  // Switch query + args based on whether we have a gradingPeriodId,
-  // but still invoke a single useQuery call.
-  // Skip the query if this is a template route
   const currentGradingPeriod = useQuery(
-    gradingPeriodId && !isTemplateRoute ? api.gradingPeriods.getById : api.gradingPeriods.get,
+    api.gradingPeriods.getById,
     gradingPeriodId && !isTemplateRoute
       ? { id: gradingPeriodId as Id<"gradingPeriods"> }
-      : {}
+      : "skip"
   );
 
   return {

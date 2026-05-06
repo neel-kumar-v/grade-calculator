@@ -84,7 +84,7 @@ export function CreateCourseModal({
     setIsSubmitting(true);
     try {
       let finalGrade = 0;
-      let fromExtraCredit = 0;
+      const fromExtraCredit = 0;
 
       if (manual) {
         const num = parseFloat(gradeNumerator);

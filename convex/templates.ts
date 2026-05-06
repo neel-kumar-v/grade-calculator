@@ -1,9 +1,10 @@
 import { query, mutation } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { auth } from "./auth";
 import { category } from "./schema";
 
-async function getCurrentUserId(ctx: any) {
+async function getCurrentUserId(ctx: QueryCtx | MutationCtx) {
   const userId = await auth.getUserId(ctx);
   if (!userId) {
     throw new Error("Unauthenticated");
@@ -161,7 +162,7 @@ export const getByUniversity = query({
     const page = args.page || 1;
     const limit = Math.min(args.limit || 20, 100);
 
-    let templates = await ctx.db
+    const templates = await ctx.db
       .query("templates")
       .withIndex("by_university_public", (q) => 
         q.eq("university", args.university).eq("public", true)
