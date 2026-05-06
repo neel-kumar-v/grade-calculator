@@ -1,4 +1,3 @@
-import { ConvexError } from "convex/values";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { z } from "zod";
 
@@ -21,7 +20,7 @@ export default function createPasswordProvider(
             return issue.message;
           })
           .join(", ");
-        throw new ConvexError(errorMessage);
+        throw new Error(errorMessage);
       }
       return { email: data.email };
     },
@@ -32,7 +31,9 @@ export default function createPasswordProvider(
         !/[a-z]/.test(password) ||
         !/[A-Z]/.test(password)
       ) {
-        throw new ConvexError("Invalid password.");
+        throw new Error(
+          "Password must be at least 8 characters and include one uppercase letter, one lowercase letter, and one number."
+        );
       }
     },
     ...options,

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { getAuthErrorMessage } from "@/lib/authErrors";
 import {
   Card,
   CardContent,
@@ -12,53 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-
-function getErrorMessage(error: unknown): string {
-  if (error && typeof error === "object") {
-    // Handle ConvexError
-    if ("message" in error) {
-      const message = String(error.message);
-      
-      // Handle password validation errors
-      if (message.includes("Invalid password")) {
-        return "Password must be at least 8 characters and contain at least one number, one lowercase letter, and one uppercase letter.";
-      }
-      
-      // Handle email validation errors from zod
-      if (message.includes("email") || message.includes("Email")) {
-        if (message.includes("Invalid email")) {
-          return "Please enter a valid email address.";
-        }
-        return "Email validation failed. Please check your email address.";
-      }
-      
-      // Handle verification code errors
-      if (message.includes("code") || message.includes("Code") || message.includes("verification")) {
-        return "Invalid verification code. Please check and try again.";
-      }
-      
-      // Return the error message as-is if it's a string
-      return message;
-    }
-    
-    // Handle error objects with data property (zod format errors)
-    if ("data" in error && error.data) {
-      try {
-        const data = typeof error.data === "string" ? JSON.parse(error.data) : error.data;
-        if (data.email) {
-          const emailError = Array.isArray(data.email._errors) 
-            ? data.email._errors[0] 
-            : "Invalid email address.";
-          return emailError;
-        }
-      } catch {
-        // If parsing fails, fall through to default
-      }
-    }
-  }
-  
-  return "An error occurred. Please try again.";
-}
 
 export function PasswordReset() {
   const { signIn } = useAuthActions();
@@ -80,8 +34,7 @@ export function PasswordReset() {
             setStep({ email: formData.get("email") as string });
             toast.success("Verification code sent! Check your email.");
           } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            toast.error(errorMessage);
+            toast.error(getAuthErrorMessage(error));
           }
         }}
       >
@@ -121,8 +74,7 @@ export function PasswordReset() {
             await signIn("password", formData);
             toast.success("Password reset successfully! You can now sign in with your new password.");
           } catch (error) {
-            const errorMessage = getErrorMessage(error);
-            toast.error(errorMessage);
+            toast.error(getAuthErrorMessage(error));
           }
         }}
       >
