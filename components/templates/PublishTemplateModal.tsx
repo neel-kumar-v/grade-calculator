@@ -1,7 +1,5 @@
 "use client";
 
-
-
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -219,4 +217,117 @@ export function PublishTemplateModal({
     }
   };
 
-  return (\n    <Dialog open={open} onOpenChange={handleClose}>\n      <DialogContent className=\"max-w-2xl\">\n        <DialogHeader>\n          <DialogTitle>{isEditMode ? \"Edit Template\" : \"Publish Template\"}</DialogTitle>\n          <DialogDescription>\n            {isEditMode\n              ? \"Update your published course template. Changes will be visible to other students.\"\n              : \"Share your course structure with other students. Your template will be searchable by course code, title, and instructor.\"}\n          </DialogDescription>\n        </DialogHeader>\n        <form onSubmit={handleSubmit} className=\"space-y-4\">\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"university\">University *</Label>\n            {!showCustomUniversity ? (\n              <>\n                <Combobox\n                  fetchOptions={fetchColleges}\n                  value={university}\n                  onValueChange={handleUniversityChange}\n                  placeholder=\"Select your university...\"\n                  searchPlaceholder=\"Search universities...\"\n                  emptyText=\"No universities found.\"\n                />\n                <Button\n                  type=\"button\"\n                  variant=\"outline\"\n                  size=\"sm\"\n                  onClick={() => {\n                    setShowCustomUniversity(true);\n                    setUniversity(\"\");\n                  }}\n                  className=\"mt-2\"\n                >\n                  Other\n                </Button>\n              </>\n            ) : (\n              <div className=\"space-y-2\">\n                <Input\n                  id=\"custom-university\"\n                  value={customUniversity}\n                  onChange={(e) => setCustomUniversity(e.target.value)}\n                  placeholder=\"Enter university name...\"\n                  required\n                />\n                <Button\n                  type=\"button\"\n                  variant=\"ghost\"\n                  size=\"sm\"\n                  onClick={() => {\n                    setShowCustomUniversity(false);\n                    setCustomUniversity(\"\");\n                    setUniversity(settings?.university || \"\");\n                  }}\n                >\n                  Use preset list\n                </Button>\n              </div>\n            )}\n          </div>\n\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"course-code\">Course Code *</Label>\n            <Input\n              id=\"course-code\"\n              value={courseCode}\n              onChange={(e) => setCourseCode(e.target.value)}\n              placeholder=\"e.g., CS 101\"\n              required\n            />\n          </div>\n\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"course-title\">Course Title / Description *</Label>\n            <Input\n              id=\"course-title\"\n              value={courseTitle}\n              onChange={(e) => setCourseTitle(e.target.value)}\n              placeholder=\"e.g., Introduction to Computer Science\"\n              required\n            />\n          </div>\n\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"instructor\">Instructor *</Label>\n            <Input\n              id=\"instructor\"\n              value={instructor}\n              onChange={(e) => setInstructor(e.target.value)}\n              placeholder=\"e.g., Dr. Smith\"\n              required\n            />\n          </div>\n\n          <DialogFooter>\n            <Button type=\"button\" variant=\"outline\" onClick={handleClose}>\n              Cancel\n            </Button>\n            <Button type=\"submit\" disabled={isSubmitting}>\n              {isSubmitting\n                ? isEditMode\n                  ? \"Saving...\"\n                  : \"Publishing...\"\n                : isEditMode\n                  ? \"Save Changes\"\n                  : \"Publish Template\"}\n            </Button>\n          </DialogFooter>\n        </form>\n      </DialogContent>\n    </Dialog>\n  );\n}\n
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{isEditMode ? "Edit Template" : "Publish Template"}</DialogTitle>
+          <DialogDescription>
+            {isEditMode
+              ? "Update your published course template. Changes will be visible to other students."
+              : "Share your course structure with other students. Your template will be searchable by course code, title, and instructor."}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="university">University *</Label>
+            {!showCustomUniversity ? (
+              <>
+                <Combobox
+                  fetchOptions={fetchColleges}
+                  value={university}
+                  onValueChange={handleUniversityChange}
+                  placeholder="Select your university..."
+                  searchPlaceholder="Search universities..."
+                  emptyText="No universities found."
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowCustomUniversity(true);
+                    setUniversity("");
+                  }}
+                  className="mt-2"
+                >
+                  Other
+                </Button>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <Input
+                  id="custom-university"
+                  value={customUniversity}
+                  onChange={(e) => setCustomUniversity(e.target.value)}
+                  placeholder="Enter university name..."
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowCustomUniversity(false);
+                    setCustomUniversity("");
+                    setUniversity(settings?.university || "");
+                  }}
+                >
+                  Use preset list
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="course-code">Course Code *</Label>
+            <Input
+              id="course-code"
+              value={courseCode}
+              onChange={(e) => setCourseCode(e.target.value)}
+              placeholder="e.g., CS 101"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="course-title">Course Title / Description *</Label>
+            <Input
+              id="course-title"
+              value={courseTitle}
+              onChange={(e) => setCourseTitle(e.target.value)}
+              placeholder="e.g., Introduction to Computer Science"
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="instructor">Instructor *</Label>
+            <Input
+              id="instructor"
+              value={instructor}
+              onChange={(e) => setInstructor(e.target.value)}
+              placeholder="e.g., Dr. Smith"
+              required
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting
+                ? isEditMode
+                  ? "Saving..."
+                  : "Publishing..."
+                : isEditMode
+                  ? "Save Changes"
+                  : "Publish Template"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
