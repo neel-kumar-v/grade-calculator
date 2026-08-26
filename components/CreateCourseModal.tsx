@@ -112,6 +112,7 @@ export function CreateCourseModal({
           ? undefined 
           : (isEditMode ? editingCourse?.categories : undefined),
         templateId: isEditMode ? editingCourse?.templateId : undefined,
+        importedTemplateId: isEditMode ? editingCourse?.importedTemplateId : undefined,
       };
 
       if (isEditMode) {

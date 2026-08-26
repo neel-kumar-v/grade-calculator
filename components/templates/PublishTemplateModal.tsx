@@ -29,7 +29,7 @@ interface PublishTemplateModalProps {
   course: Course;
   gradingPeriodId: Id<"gradingPeriods">;
   courseIndex: number;
-  existingTemplate?: (Doc<"templates"> & { isCreator?: boolean }) | null;
+  existingTemplate?: (Doc<"templates"> & { isCreator?: boolean; isImported?: boolean }) | null;
   onTemplateSaved?: (templateId: Id<"templates">) => void;
 }
 
@@ -62,7 +62,7 @@ export function PublishTemplateModal({
   const settings = useQuery(api.settings.get);
   const updateSettings = useMutation(api.settings.update);
 
-  const isEditMode = Boolean(existingTemplate);
+  const isEditMode = Boolean(existingTemplate && existingTemplate.isCreator && !existingTemplate.isImported);
 
   const [university, setUniversity] = useState<string>("");
   const [showCustomUniversity, setShowCustomUniversity] = useState(false);
@@ -77,7 +77,7 @@ export function PublishTemplateModal({
     if (open) {
       if (existingTemplate) {
         setUniversity(existingTemplate.university || settings?.university || "");
-        setCourseCode(existingTemplate.courseCode || "");
+        setCourseCode(existingTemplate.courseCode || course?.name || "");
         setCourseTitle(existingTemplate.courseTitle || "");
         setInstructor(existingTemplate.instructor || "");
         setShowCustomUniversity(false);
@@ -153,7 +153,7 @@ export function PublishTemplateModal({
 
       // Prepare categories for template (remove grade and assignments, keep structure)
       const templateCategories: Category[] = course.categories.map((cat) => {
-        const { grade, assignments, ...categoryData } = cat;
+        const { grade: _grade, assignments: _assignments, ...categoryData } = cat;
         return {
           ...categoryData,
           grade: 0, // Reset grade
@@ -192,6 +192,7 @@ export function PublishTemplateModal({
           courseTitle: courseTitle.trim(),
           instructor: instructor.trim(),
           categories: templateCategories,
+          importedTemplateId: course.importedTemplateId,
         });
 
         // Link course to newly created template
@@ -201,6 +202,7 @@ export function PublishTemplateModal({
           course: {
             ...course,
             templateId,
+            importedTemplateId: undefined, // Clear importedTemplateId now that user is owner
           },
         });
 
@@ -209,9 +211,10 @@ export function PublishTemplateModal({
       }
 
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to ${isEditMode ? "update" : "publish"} template:`, error);
-      toast.error(`Failed to ${isEditMode ? "update" : "publish"} template. Please try again.`);
+      const message = error?.message || `Failed to ${isEditMode ? "update" : "publish"} template. Please try again.`;
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }

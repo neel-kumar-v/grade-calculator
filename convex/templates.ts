@@ -20,9 +20,37 @@ export const create = mutation({
     courseTitle: v.string(),
     instructor: v.string(),
     categories: v.array(category),
+    importedTemplateId: v.optional(v.id("templates")),
   },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
+
+    // If imported from an existing template created by someone else, verify it was modified
+    if (args.importedTemplateId) {
+      const imported = await ctx.db.get(args.importedTemplateId);
+      if (imported && imported.createdBy !== userId) {
+        const areCategoriesIdentical = (
+          imported.categories.length === args.categories.length &&
+          imported.categories.every((c, i) => {
+            const argCat = args.categories[i];
+            return (
+              c.name.trim().toLowerCase() === argCat.name.trim().toLowerCase() &&
+              c.weight === argCat.weight &&
+              c.evenly_weighted === argCat.evenly_weighted &&
+              c.extra_credit === argCat.extra_credit &&
+              c.manual === argCat.manual &&
+              JSON.stringify(c.drop_policy) === JSON.stringify(argCat.drop_policy)
+            );
+          })
+        );
+
+        if (areCategoriesIdentical) {
+          throw new Error(
+            "You cannot publish an unmodified imported template. Please customize the categories or weights first."
+          );
+        }
+      }
+    }
 
     // Run moderation on free text fields
     const shouldShadowBan = false;
@@ -187,6 +215,7 @@ export const getById = query({
 export const getTemplateForCourse = query({
   args: {
     templateId: v.optional(v.id("templates")),
+    importedTemplateId: v.optional(v.id("templates")),
     courseName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -197,6 +226,7 @@ export const getTemplateForCourse = query({
       userId = null;
     }
 
+    // 1. If user published a template from this course, check ownership
     if (args.templateId) {
       const template = await ctx.db.get(args.templateId);
       if (template) {
@@ -204,6 +234,19 @@ export const getTemplateForCourse = query({
         return {
           ...template,
           isCreator,
+        };
+      }
+    }
+
+    // 2. If user imported a template from someone else, fetch it for comparison
+    if (args.importedTemplateId) {
+      const importedTemplate = await ctx.db.get(args.importedTemplateId);
+      if (importedTemplate) {
+        const isCreator = Boolean(userId && importedTemplate.createdBy && userId === importedTemplate.createdBy);
+        return {
+          ...importedTemplate,
+          isCreator,
+          isImported: true,
         };
       }
     }

@@ -188,11 +188,34 @@ export function CourseCategories({
     api.templates.getTemplateForCourse,
     {
       templateId: workingCourse.templateId,
+      importedTemplateId: workingCourse.importedTemplateId,
       courseName: normalized.name,
     }
   );
 
-  const isTemplateCreator = Boolean(templateInfo?.isCreator);
+  const isTemplateCreator = Boolean(templateInfo?.isCreator && !templateInfo?.isImported);
+
+  // Check if categories were modified since importing
+  const hasModifiedImportedTemplate = useMemo(() => {
+    if (!templateInfo || !templateInfo.isImported) return true;
+    const currentCats = workingCourse.categories ?? [];
+    const importedCats = templateInfo.categories ?? [];
+
+    if (currentCats.length !== importedCats.length) return true;
+
+    return !importedCats.every((c, i) => {
+      const cur = currentCats[i];
+      if (!cur) return false;
+      return (
+        c.name.trim().toLowerCase() === cur.name.trim().toLowerCase() &&
+        c.weight === cur.weight &&
+        c.evenly_weighted === cur.evenly_weighted &&
+        c.extra_credit === cur.extra_credit &&
+        c.manual === cur.manual &&
+        JSON.stringify(c.drop_policy) === JSON.stringify(cur.drop_policy)
+      );
+    });
+  }, [templateInfo, workingCourse.categories]);
 
   const actualGrade = useMemo(() => {
     if (normalized.manual) {
@@ -396,7 +419,9 @@ export function CourseCategories({
     const nextCourse = {
       ...liveCourse,
       categories: importedCategories,
-      templateId: template._id,
+      importedTemplateId: template._id,
+      // If user created this template themselves, keep templateId; otherwise unset templateId so it's not their own publish yet
+      templateId: template.isCreator ? template._id : undefined,
     };
 
     updateLocalAndPersist(nextCourse);
@@ -514,6 +539,12 @@ export function CourseCategories({
                 variant="default"
                 onClick={() => setIsPublishModalOpen(true)}
                 type="button"
+                disabled={!hasModifiedImportedTemplate}
+                title={
+                  !hasModifiedImportedTemplate
+                    ? "Modify this imported template's categories before publishing"
+                    : undefined
+                }
                 className="w-full sm:w-auto"
               >
                 <Upload className="size-4" />
@@ -663,7 +694,7 @@ export function CourseCategories({
                   const value = e.target.value;
                   const key = `overall-grade-whatif-${courseIndex}`;
                   // Allow empty, numbers, and decimal point
-                  if (value === "" || /^-?\\d*\\.?\\d*$/.test(value)) {
+                  if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
                     // Store the string value for display
                     setInputValues(prev => ({ ...prev, [key]: value }));
                     // Update the actual value if it's a complete number
@@ -745,11 +776,11 @@ export function CourseCategories({
         course={workingCourse}
         gradingPeriodId={gradingPeriodId}
         courseIndex={courseIndex}
-        existingTemplate={isTemplateCreator ? templateInfo : undefined}
+        existingTemplate={templateInfo}
         onTemplateSaved={(templateId) => {
-          setLiveCourse((prev) => ({ ...prev, templateId }));
+          setLiveCourse((prev) => ({ ...prev, templateId, importedTemplateId: undefined }));
           if (draftCourse) {
-            setDraftCourse((prev) => (prev ? { ...prev, templateId } : null));
+            setDraftCourse((prev) => (prev ? { ...prev, templateId, importedTemplateId: undefined } : null));
           }
         }}
       />

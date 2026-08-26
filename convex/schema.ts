@@ -31,6 +31,7 @@ export const course = v.object({
   part_of_degree: v.boolean(),
   categories: v.optional(v.array(category)),
   templateId: v.optional(v.id("templates")),
+  importedTemplateId: v.optional(v.id("templates")),
 });
 
 export const gradingPeriodInput = v.object({
