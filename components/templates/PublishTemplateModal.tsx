@@ -1,5 +1,7 @@
 "use client";
 
+
+
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -27,6 +29,10 @@ interface PublishTemplateModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   course: Course;
+  gradingPeriodId: Id<"gradingPeriods">;
+  courseIndex: number;
+  existingTemplate?: (Doc<"templates"> & { isCreator?: boolean }) | null;
+  onTemplateSaved?: (templateId: Id<"templates">) => void;
 }
 
 async function fetchColleges(query: string, page: number): Promise<{ data: string[]; hasMore: boolean }> {
@@ -47,10 +53,18 @@ export function PublishTemplateModal({
   open,
   onOpenChange,
   course,
+  gradingPeriodId,
+  courseIndex,
+  existingTemplate,
+  onTemplateSaved,
 }: PublishTemplateModalProps) {
   const createTemplate = useMutation(api.templates.create);
+  const updateTemplate = useMutation(api.templates.update);
+  const updateCourse = useMutation(api.gradingPeriods.updateCourse);
   const settings = useQuery(api.settings.get);
   const updateSettings = useMutation(api.settings.update);
+
+  const isEditMode = Boolean(existingTemplate);
 
   const [university, setUniversity] = useState<string>("");
   const [showCustomUniversity, setShowCustomUniversity] = useState(false);
@@ -60,12 +74,26 @@ export function PublishTemplateModal({
   const [instructor, setInstructor] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load user's university from settings
+  // Load existing template data or user settings when opened
   useEffect(() => {
-    if (settings?.university) {
-      setUniversity(settings.university);
+    if (open) {
+      if (existingTemplate) {
+        setUniversity(existingTemplate.university || settings?.university || "");
+        setCourseCode(existingTemplate.courseCode || "");
+        setCourseTitle(existingTemplate.courseTitle || "");
+        setInstructor(existingTemplate.instructor || "");
+        setShowCustomUniversity(false);
+        setCustomUniversity("");
+      } else {
+        setUniversity(settings?.university || "");
+        setCourseCode(course?.name || "");
+        setCourseTitle("");
+        setInstructor("");
+        setShowCustomUniversity(false);
+        setCustomUniversity("");
+      }
     }
-  }, [settings]);
+  }, [open, existingTemplate, settings, course]);
 
   const reset = () => {
     setUniversity(settings?.university || "");
@@ -135,128 +163,60 @@ export function PublishTemplateModal({
         } as Category;
       });
 
-      await createTemplate({
-        university: finalUniversity,
-        courseCode: courseCode.trim(),
-        courseTitle: courseTitle.trim(),
-        instructor: instructor.trim(),
-        categories: templateCategories,
-      });
+      if (isEditMode && existingTemplate) {
+        // Update existing template
+        await updateTemplate({
+          id: existingTemplate._id,
+          university: finalUniversity,
+          courseCode: courseCode.trim(),
+          courseTitle: courseTitle.trim(),
+          instructor: instructor.trim(),
+          categories: templateCategories,
+        });
 
-      toast.success("Template published successfully!");
+        // Ensure course is linked to this template
+        await updateCourse({
+          gradingPeriodId,
+          courseIndex,
+          course: {
+            ...course,
+            templateId: existingTemplate._id,
+          },
+        });
+
+        onTemplateSaved?.(existingTemplate._id);
+        toast.success("Template updated successfully!");
+      } else {
+        // Create new template
+        const templateId = await createTemplate({
+          university: finalUniversity,
+          courseCode: courseCode.trim(),
+          courseTitle: courseTitle.trim(),
+          instructor: instructor.trim(),
+          categories: templateCategories,
+        });
+
+        // Link course to newly created template
+        await updateCourse({
+          gradingPeriodId,
+          courseIndex,
+          course: {
+            ...course,
+            templateId,
+          },
+        });
+
+        onTemplateSaved?.(templateId);
+        toast.success("Template published successfully!");
+      }
+
       handleClose();
     } catch (error) {
-      console.error("Failed to publish template:", error);
-      toast.error("Failed to publish template. Please try again.");
+      console.error(`Failed to ${isEditMode ? "update" : "publish"} template:`, error);
+      toast.error(`Failed to ${isEditMode ? "update" : "publish"} template. Please try again.`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Publish Template</DialogTitle>
-          <DialogDescription>
-            Share your course structure with other students. Your template will be searchable by course code, title, and instructor.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="university">University *</Label>
-            {!showCustomUniversity ? (
-              <>
-                <Combobox
-                  fetchOptions={fetchColleges}
-                  value={university}
-                  onValueChange={handleUniversityChange}
-                  placeholder="Select your university..."
-                  searchPlaceholder="Search universities..."
-                  emptyText="No universities found."
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setShowCustomUniversity(true);
-                    setUniversity("");
-                  }}
-                  className="mt-2"
-                >
-                  Other
-                </Button>
-              </>
-            ) : (
-              <div className="space-y-2">
-                <Input
-                  id="custom-university"
-                  value={customUniversity}
-                  onChange={(e) => setCustomUniversity(e.target.value)}
-                  placeholder="Enter university name..."
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowCustomUniversity(false);
-                    setCustomUniversity("");
-                    setUniversity(settings?.university || "");
-                  }}
-                >
-                  Use preset list
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="course-code">Course Code *</Label>
-            <Input
-              id="course-code"
-              value={courseCode}
-              onChange={(e) => setCourseCode(e.target.value)}
-              placeholder="e.g., CS 101"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="course-title">Course Title / Description *</Label>
-            <Input
-              id="course-title"
-              value={courseTitle}
-              onChange={(e) => setCourseTitle(e.target.value)}
-              placeholder="e.g., Introduction to Computer Science"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="instructor">Instructor *</Label>
-            <Input
-              id="instructor"
-              value={instructor}
-              onChange={(e) => setInstructor(e.target.value)}
-              placeholder="e.g., Dr. Smith"
-              required
-            />
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Publishing..." : "Publish Template"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
+  return (\n    <Dialog open={open} onOpenChange={handleClose}>\n      <DialogContent className=\"max-w-2xl\">\n        <DialogHeader>\n          <DialogTitle>{isEditMode ? \"Edit Template\" : \"Publish Template\"}</DialogTitle>\n          <DialogDescription>\n            {isEditMode\n              ? \"Update your published course template. Changes will be visible to other students.\"\n              : \"Share your course structure with other students. Your template will be searchable by course code, title, and instructor.\"}\n          </DialogDescription>\n        </DialogHeader>\n        <form onSubmit={handleSubmit} className=\"space-y-4\">\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"university\">University *</Label>\n            {!showCustomUniversity ? (\n              <>\n                <Combobox\n                  fetchOptions={fetchColleges}\n                  value={university}\n                  onValueChange={handleUniversityChange}\n                  placeholder=\"Select your university...\"\n                  searchPlaceholder=\"Search universities...\"\n                  emptyText=\"No universities found.\"\n                />\n                <Button\n                  type=\"button\"\n                  variant=\"outline\"\n                  size=\"sm\"\n                  onClick={() => {\n                    setShowCustomUniversity(true);\n                    setUniversity(\"\");\n                  }}\n                  className=\"mt-2\"\n                >\n                  Other\n                </Button>\n              </>\n            ) : (\n              <div className=\"space-y-2\">\n                <Input\n                  id=\"custom-university\"\n                  value={customUniversity}\n                  onChange={(e) => setCustomUniversity(e.target.value)}\n                  placeholder=\"Enter university name...\"\n                  required\n                />\n                <Button\n                  type=\"button\"\n                  variant=\"ghost\"\n                  size=\"sm\"\n                  onClick={() => {\n                    setShowCustomUniversity(false);\n                    setCustomUniversity(\"\");\n                    setUniversity(settings?.university || \"\");\n                  }}\n                >\n                  Use preset list\n                </Button>\n              </div>\n            )}\n          </div>\n\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"course-code\">Course Code *</Label>\n            <Input\n              id=\"course-code\"\n              value={courseCode}\n              onChange={(e) => setCourseCode(e.target.value)}\n              placeholder=\"e.g., CS 101\"\n              required\n            />\n          </div>\n\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"course-title\">Course Title / Description *</Label>\n            <Input\n              id=\"course-title\"\n              value={courseTitle}\n              onChange={(e) => setCourseTitle(e.target.value)}\n              placeholder=\"e.g., Introduction to Computer Science\"\n              required\n            />\n          </div>\n\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"instructor\">Instructor *</Label>\n            <Input\n              id=\"instructor\"\n              value={instructor}\n              onChange={(e) => setInstructor(e.target.value)}\n              placeholder=\"e.g., Dr. Smith\"\n              required\n            />\n          </div>\n\n          <DialogFooter>\n            <Button type=\"button\" variant=\"outline\" onClick={handleClose}>\n              Cancel\n            </Button>\n            <Button type=\"submit\" disabled={isSubmitting}>\n              {isSubmitting\n                ? isEditMode\n                  ? \"Saving...\"\n                  : \"Publishing...\"\n                : isEditMode\n                  ? \"Save Changes\"\n                  : \"Publish Template\"}\n            </Button>\n          </DialogFooter>\n        </form>\n      </DialogContent>\n    </Dialog>\n  );\n}\n

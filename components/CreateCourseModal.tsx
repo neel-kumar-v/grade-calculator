@@ -111,6 +111,7 @@ export function CreateCourseModal({
         categories: manual 
           ? undefined 
           : (isEditMode ? editingCourse?.categories : undefined),
+        templateId: isEditMode ? editingCourse?.templateId : undefined,
       };
 
       if (isEditMode) {
@@ -321,4 +322,3 @@ export function CreateCourseModal({
     </Dialog>
   );
 }
-

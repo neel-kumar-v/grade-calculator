@@ -3,6 +3,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { auth } from "./auth";
 import { category } from "./schema";
+import type { Id } from "./_generated/dataModel";
 
 async function getCurrentUserId(ctx: QueryCtx | MutationCtx) {
   const userId = await auth.getUserId(ctx);
@@ -44,6 +45,43 @@ export const create = mutation({
     });
 
     return templateId;
+  },
+});
+
+export const update = mutation({
+  args: {
+    id: v.id("templates"),
+    university: v.string(),
+    courseCode: v.string(),
+    courseTitle: v.string(),
+    instructor: v.string(),
+    categories: v.array(category),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getCurrentUserId(ctx);
+    const template = await ctx.db.get(args.id);
+
+    if (!template) {
+      throw new Error("Template not found");
+    }
+
+    if (template.createdBy !== userId) {
+      throw new Error("Unauthorized: You can only edit templates you created");
+    }
+
+    if (!args.categories || args.categories.length === 0) {
+      throw new Error("Template must have at least one category");
+    }
+
+    await ctx.db.patch(args.id, {
+      university: args.university,
+      courseCode: args.courseCode,
+      courseTitle: args.courseTitle,
+      instructor: args.instructor,
+      categories: args.categories,
+    });
+
+    return args.id;
   },
 });
 
@@ -124,12 +162,82 @@ export const getById = query({
       return null;
     }
 
-    // Only return public templates
-    if (!template.public) {
+    let isCreator = false;
+    try {
+      const userId = await auth.getUserId(ctx);
+      if (userId && template.createdBy && userId === template.createdBy) {
+        isCreator = true;
+      }
+    } catch {
+      // Unauthenticated
+    }
+
+    // Only return public templates unless creator
+    if (!template.public && !isCreator) {
       return null;
     }
 
-    return template;
+    return {
+      ...template,
+      isCreator,
+    };
+  },
+});
+
+export const getTemplateForCourse = query({
+  args: {
+    templateId: v.optional(v.id("templates")),
+    courseName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let userId: Id<"users"> | null = null;
+    try {
+      userId = await auth.getUserId(ctx);
+    } catch {
+      userId = null;
+    }
+
+    if (args.templateId) {
+      const template = await ctx.db.get(args.templateId);
+      if (template) {
+        const isCreator = Boolean(userId && template.createdBy && userId === template.createdBy);
+        return {
+          ...template,
+          isCreator,
+        };
+      }
+    }
+
+    // Fallback: If no templateId or template not found, check if current user created a template with matching courseCode/title
+    if (userId && args.courseName) {
+      const userTemplates = await ctx.db
+        .query("templates")
+        .withIndex("by_createdBy", (q) => q.eq("createdBy", userId!))
+        .collect();
+
+      const normalizedCourseName = args.courseName.trim().toLowerCase();
+      const match = userTemplates.find((t) => {
+        const code = t.courseCode.trim().toLowerCase();
+        const title = t.courseTitle.trim().toLowerCase();
+        const combined = `${code} - ${title}`.toLowerCase();
+        return (
+          code === normalizedCourseName ||
+          title === normalizedCourseName ||
+          combined === normalizedCourseName ||
+          normalizedCourseName.startsWith(code) ||
+          code.startsWith(normalizedCourseName)
+        );
+      });
+
+      if (match) {
+        return {
+          ...match,
+          isCreator: true,
+        };
+      }
+    }
+
+    return null;
   },
 });
 
@@ -198,4 +306,3 @@ export const getByUniversity = query({
     };
   },
 });
-

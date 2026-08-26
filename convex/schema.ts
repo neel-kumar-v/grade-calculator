@@ -30,6 +30,7 @@ export const course = v.object({
   from_extra_credit: v.number(),
   part_of_degree: v.boolean(),
   categories: v.optional(v.array(category)),
+  templateId: v.optional(v.id("templates")),
 });
 
 export const gradingPeriodInput = v.object({
@@ -80,7 +81,8 @@ const schema = defineSchema({
   templates: defineTable(template)
     .index("by_university", ["university"])
     .index("by_public", ["public"])
-    .index("by_university_public", ["university", "public"]),
+    .index("by_university_public", ["university", "public"])
+    .index("by_createdBy", ["createdBy"]),
 });
  
 export default schema;
