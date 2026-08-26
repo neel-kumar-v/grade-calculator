@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
-import { Authenticated, Unauthenticated } from "convex/react";
+import { Unauthenticated } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -61,7 +61,6 @@ function categoryGrade(category: Category & { assignments?: Assignment[] }): num
     if (category.drop_policy.drop_with === undefined) {
       assignments = assignments.filter((_, idx) => !toDropIndices.has(idx));
     } else {
-      const replaceCategoryIndex = category.drop_policy.drop_with;
       // For template pages, we'll skip replacement logic as it's complex without all categories
       assignments = assignments.filter((_, idx) => !toDropIndices.has(idx));
     }
@@ -138,7 +137,7 @@ export default function TemplatePage({ params }: PageProps) {
           return cat.grade !== 100;
         } else {
           return cat.assignments?.some(
-            (a, aIdx) =>
+            (a) =>
               a.score !== 100 ||
               a.max_score !== 100 ||
               (original.assignments?.length ?? 0) !== cat.assignments?.length
@@ -252,7 +251,7 @@ export default function TemplatePage({ params }: PageProps) {
     return `${num.toFixed(2).replace(/\.00$/, "")}%`;
   };
 
-  const categoryGradeFn = (cat: Category & { assignments?: Assignment[] }, allCats?: Category[]) => {
+  const categoryGradeFn = (cat: Category & { assignments?: Assignment[] }) => {
     return categoryGrade(cat);
   };
 

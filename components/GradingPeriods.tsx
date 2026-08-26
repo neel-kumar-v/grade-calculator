@@ -6,7 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
 import { CreateGradingPeriodModal } from "./CreateGradingPeriodModal";
-import type { Doc, Id } from "../convex/_generated/dataModel";
+import type { Doc } from "../convex/_generated/dataModel";
 import { getScaleByName, calculateGPA } from "../lib/gpa";
 import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
 

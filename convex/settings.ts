@@ -3,7 +3,6 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 import { auth } from "./auth";
-import { api } from "./_generated/api";
 import { getScaleByName, calculateGPA } from "../lib/gpa";
 
 type ConvexCtx = QueryCtx | MutationCtx;
@@ -46,7 +45,7 @@ export const update = mutation({
     let userId: Id<"users">;
     try {
       userId = await getCurrentUserId(ctx);
-    } catch (error) {
+    } catch {
       // If user is not authenticated or user record doesn't exist yet, return null
       return null;
     }

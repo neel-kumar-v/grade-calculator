@@ -11,16 +11,7 @@ import {
   AccordionTrigger,
 } from "./ui/accordion";
 import { Button } from "./ui/button";
-import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 import { CreateCategoryModal } from "./CreateCategoryModal";
 import { PublishTemplateModal } from "./templates/PublishTemplateModal";
 import { ImportTemplateModal } from "./templates/ImportTemplateModal";

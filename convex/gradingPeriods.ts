@@ -36,12 +36,6 @@ async function getUserGPAScale(ctx: ConvexCtx): Promise<ReturnType<typeof getSca
   return getScaleByName("STANDARD_4_0");
 }
 
-// Convert percentage (0-100) to GPA using user's scale
-async function percentageToGPA(ctx: ConvexCtx, percentage: number): Promise<number> {
-  const scale = await getUserGPAScale(ctx);
-  return calculateGPA(percentage, scale);
-}
-
 export const get = query({
   args: {},
   handler: async (ctx) => {

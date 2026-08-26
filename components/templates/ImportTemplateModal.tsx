@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +15,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Combobox } from "../ui/combobox";
-import { Card, CardHeader, CardTitle } from "../ui/card";
+import { Card, CardTitle } from "../ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
@@ -152,13 +151,6 @@ export function ImportTemplateModal({
     }
   }, [settings]);
 
-  // Load initial templates
-  useEffect(() => {
-    if (open) {
-      loadTemplates("", university, 1, false);
-    }
-  }, [open, university]);
-
   const loadTemplates = useCallback(
     async (query: string, uni: string, pageNum: number, append: boolean) => {
       setLoading(true);
@@ -182,6 +174,13 @@ export function ImportTemplateModal({
     },
     []
   );
+
+  // Load initial templates
+  useEffect(() => {
+    if (open) {
+      loadTemplates("", university, 1, false);
+    }
+  }, [open, university, loadTemplates]);
 
   // Handle search with debounce
   useEffect(() => {
