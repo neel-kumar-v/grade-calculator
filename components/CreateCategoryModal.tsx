@@ -123,6 +123,25 @@ export function CreateCategoryModal({
     handleClose();
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    const isModifier = e.ctrlKey || e.metaKey;
+
+    if (isModifier && e.key === "Enter") {
+      e.preventDefault();
+      if (name.trim() && weight > 0) {
+        e.currentTarget.requestSubmit();
+      }
+    }
+
+    if (isModifier && (e.key === "Backspace" || e.key === "Delete")) {
+      if (isEditMode && onDelete) {
+        e.preventDefault();
+        onDelete();
+        handleClose();
+      }
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -134,7 +153,7 @@ export function CreateCategoryModal({
               : "Define how this category contributes to your course grade."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="category-name">Name</Label>
             <Input
@@ -183,7 +202,7 @@ export function CreateCategoryModal({
                   value={manualScoreInput || String(manualScore)}
                   onChange={(e) => {
                     const value = e.target.value;
-                    if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                    if (value === "" || /^-?\\d*\\.?\\d*$/.test(value)) {
                       setManualScoreInput(value);
                       if (value !== "" && value !== "." && !value.endsWith(".")) {
                         const numValue = Number(value);
@@ -259,7 +278,9 @@ export function CreateCategoryModal({
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit">{isEditMode ? "Save Edits" : "Create Category"}</Button>
+              <Button type="submit" disabled={!name.trim() || weight <= 0}>
+                {isEditMode ? "Save Edits" : "Create Category"}
+              </Button>
             </div>
           </DialogFooter>
         </form>

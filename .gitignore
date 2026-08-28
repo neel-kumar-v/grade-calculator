@@ -40,3 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /convex/_generated
+
+# agent files
+.agents/
+.claude/
+AGENTS.md
+CLAUDE.md
+skills-lock.json

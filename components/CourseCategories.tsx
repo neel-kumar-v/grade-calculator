@@ -13,10 +13,13 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { CreateCategoryModal } from "./CreateCategoryModal";
+import { CreateCourseModal } from "./CreateCourseModal";
 import { PublishTemplateModal } from "./templates/PublishTemplateModal";
 import { ImportTemplateModal } from "./templates/ImportTemplateModal";
 import { CategoryInputs, renderCategoryGradeDisplay } from "./CategoryInputs";
 import { Plus, Pencil, TriangleAlert, Download, Upload } from "lucide-react";
+import { convertGradeToLetter } from "../lib/gpa";
+import { usePageShortcuts } from "../hooks/usePageShortcuts";
 
 type GradingPeriod = Doc<"gradingPeriods">;
 type Course = GradingPeriod["courses"][number];
@@ -105,7 +108,6 @@ function categoryGrade(category: Category, allCategories?: Category[]): number {
       const replaceCategory = allCategories[replaceCategoryIndex];
       const replaceGrade = categoryGrade(replaceCategory, allCategories);
 
-
       assignments = assignments.map((assignment, idx) => {
         if (!toDropIndices.has(idx)) return assignment;
         return {
@@ -159,6 +161,7 @@ export function CourseCategories({
   const [draftCourse, setDraftCourse] = useState<Course | null>(null);
   const [liveCourse, setLiveCourse] = useState<Course>(() => normalizeCourse(course));
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState<number | null>(null);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -184,11 +187,16 @@ export function CourseCategories({
     }
   );
 
-  const isTemplateCreator = Boolean(templateInfo?.isCreator && !templateInfo?.isImported);
+  const isTemplateCreator = Boolean(
+    templateInfo &&
+    "isCreator" in templateInfo &&
+    templateInfo.isCreator &&
+    !("isImported" in templateInfo && (templateInfo as { isImported?: boolean }).isImported)
+  );
 
   // Check if categories were modified since importing
   const hasModifiedImportedTemplate = useMemo(() => {
-    if (!templateInfo || !templateInfo.isImported) return true;
+    if (!templateInfo || !("isImported" in templateInfo && (templateInfo as { isImported?: boolean }).isImported)) return true;
     const currentCats = workingCourse.categories ?? [];
     const importedCats = templateInfo.categories ?? [];
 
@@ -207,6 +215,24 @@ export function CourseCategories({
       );
     });
   }, [templateInfo, workingCourse.categories]);
+
+  usePageShortcuts({
+    onNew: () => {
+      setSelectedCategoryIndex(null);
+      setIsCategoryModalOpen(true);
+    },
+    onPublish: () => {
+      if (normalized.manual) return;
+      if ((normalized.categories ?? []).length === 0) {
+        setIsImportModalOpen(true);
+      } else if (isTemplateCreator || hasModifiedImportedTemplate) {
+        setIsPublishModalOpen(true);
+      }
+    },
+    onDelete: () => {
+      setIsCourseModalOpen(true);
+    },
+  });
 
   const actualGrade = useMemo(() => {
     if (normalized.manual) {
@@ -228,7 +254,7 @@ export function CourseCategories({
   );
 
   const normalizeForSave = (c: Course): Course => {
-  const categories: Category[] = (c.categories ?? []).map((cat) => {
+    const categories: Category[] = (c.categories ?? []).map((cat) => {
       const gradeNumber = categoryGrade(cat, c.categories ?? []) * 100;
       return {
         ...cat,
@@ -407,12 +433,14 @@ export function CourseCategories({
       }
     });
 
+    const isCreator = "isCreator" in template && Boolean((template as { isCreator?: boolean }).isCreator);
+
     const nextCourse = {
       ...liveCourse,
       categories: importedCategories,
       importedTemplateId: template._id,
       // If user created this template themselves, keep templateId; otherwise unset templateId so it's not their own publish yet
-      templateId: template.isCreator ? template._id : undefined,
+      templateId: isCreator ? template._id : undefined,
     };
 
     updateLocalAndPersist(nextCourse);
@@ -465,32 +493,36 @@ export function CourseCategories({
   };
 
   return (
-    <div className="container max-w-2xl  mx-auto py-12 px-6 flex flex-col gap-6">
+    <div className="container max-w-2xl mx-auto py-12 px-6 flex flex-col gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">{normalized.name}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 style={{ viewTransitionName: `course-title-${courseIndex}` }} className="text-2xl font-bold w-fit">{normalized.name}</h1>
+          <p style={{ viewTransitionName: `course-credits-${courseIndex}` }} className="text-sm text-muted-foreground w-fit">
             {normalized.credits} credit{normalized.credits !== 1 ? "s" : ""}
           </p>
         </div>
         {!normalized.manual && (
           <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto sm:items-center">
-            {!whatIf && <label className="flex w-full items-center gap-2 text-sm sm:w-auto">
-              <Button
-                variant={whatIf ? "default" : "outline"}
-                onClick={toggleWhatIf}
-                type="button"
-                className="w-full sm:w-auto"
-              >
-                What-if mode
-              </Button>
-            </label>}
+            {!whatIf && (
+              <label className="flex w-full items-center gap-2 text-sm sm:w-auto">
+                <Button
+                  variant={whatIf ? "default" : "outline"}
+                  onClick={toggleWhatIf}
+                  type="button"
+                  className="w-full sm:w-auto"
+                >
+                  What-if mode
+                </Button>
+              </label>
+            )}
             {whatIf && (
               <>
                 <Button variant="outline" onClick={handleCancel} className="w-full sm:w-auto">
                   Cancel
                 </Button>
-                <Button variant="outline" onClick={handleSave} className="w-full sm:w-auto">Save changes</Button>
+                <Button variant="outline" onClick={handleSave} className="w-full sm:w-auto">
+                  Save changes
+                </Button>
               </>
             )}
             <Button
@@ -629,98 +661,113 @@ export function CourseCategories({
         {normalized.manual ? (
           !whatIf ? (
             <div className="flex items-center gap-2">
-              <Input
-                type="text"
-                value={inputValues[`overall-grade-${courseIndex}`] ?? workingCourse.grade.toFixed(2)}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const key = `overall-grade-${courseIndex}`;
-                  // Allow empty, numbers, and decimal point
-                  if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
-                    // Store the string value for display
-                    setInputValues(prev => ({ ...prev, [key]: value }));
-                    // Update the actual value if it's a complete number
-                    if (value !== "" && value !== "." && !value.endsWith(".")) {
-                      const newGrade = Number(value) || 0;
-                      if (newGrade >= 0 && newGrade <= 100) {
-                        const updatedCourse = { ...workingCourse, grade: newGrade };
-                        if (whatIf) {
-                          setDraftCourse(updatedCourse);
-                        } else {
-                          updateLocalAndPersist(updatedCourse);
+              <div style={{ viewTransitionName: `course-grade-${courseIndex}` }} className="flex items-center gap-2 w-fit">
+                <Input
+                  type="text"
+                  value={inputValues[`overall-grade-${courseIndex}`] ?? workingCourse.grade.toFixed(2)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const key = `overall-grade-${courseIndex}`;
+                    // Allow empty, numbers, and decimal point
+                    if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                      // Store the string value for display
+                      setInputValues(prev => ({ ...prev, [key]: value }));
+                      // Update the actual value if it's a complete number
+                      if (value !== "" && value !== "." && !value.endsWith(".")) {
+                        const newGrade = Number(value) || 0;
+                        if (newGrade >= 0 && newGrade <= 100) {
+                          const updatedCourse = { ...workingCourse, grade: newGrade };
+                          if (whatIf) {
+                            setDraftCourse(updatedCourse);
+                          } else {
+                            updateLocalAndPersist(updatedCourse);
+                          }
                         }
                       }
                     }
-                  }
-                }}
-                onBlur={(e) => {
-                  const value = e.target.value;
-                  const key = `overall-grade-${courseIndex}`;
-                  const newGrade = value === "" || value === "." ? 0 : Number(value) || 0;
-                  if (newGrade >= 0 && newGrade <= 100) {
-                    const updatedCourse = { ...workingCourse, grade: newGrade };
-                    if (whatIf) {
-                      setDraftCourse(updatedCourse);
-                    } else {
-                      updateLocalAndPersist(updatedCourse);
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value;
+                    const key = `overall-grade-${courseIndex}`;
+                    const newGrade = value === "" || value === "." ? 0 : Number(value) || 0;
+                    if (newGrade >= 0 && newGrade <= 100) {
+                      const updatedCourse = { ...workingCourse, grade: newGrade };
+                      if (whatIf) {
+                        setDraftCourse(updatedCourse);
+                      } else {
+                        updateLocalAndPersist(updatedCourse);
+                      }
                     }
-                  }
-                  setInputValues(prev => {
-                    const next = { ...prev };
-                    delete next[key];
-                    return next;
-                  });
-                }}
-                className="w-24 text-xl font-semibold"
-                inputMode="decimal"
-              />
-              <span className="text-xl font-semibold">%</span>
+                    setInputValues(prev => {
+                      const next = { ...prev };
+                      delete next[key];
+                      return next;
+                    });
+                  }}
+                  className="w-24 text-xl font-semibold"
+                  inputMode="decimal"
+                />
+                <span className="text-xl font-semibold">%</span>
+              </div>
+              <span style={{ viewTransitionName: `course-letter-${courseIndex}` }} className="text-xl font-semibold min-w-10 text-center w-fit">
+                {convertGradeToLetter(workingCourse.grade)}
+              </span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Input
-                type="text"
-                value={inputValues[`overall-grade-whatif-${courseIndex}`] ?? workingCourse.grade.toFixed(2)}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  const key = `overall-grade-whatif-${courseIndex}`;
-                  // Allow empty, numbers, and decimal point
-                  if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
-                    // Store the string value for display
-                    setInputValues(prev => ({ ...prev, [key]: value }));
-                    // Update the actual value if it's a complete number
-                    if (value !== "" && value !== "." && !value.endsWith(".")) {
-                      const newGrade = Number(value) || 0;
-                      if (newGrade >= 0 && newGrade <= 100) {
-                        setDraftCourse({ ...workingCourse, grade: newGrade });
+              <div className="flex items-center gap-2">
+                <Input
+                  type="text"
+                  value={inputValues[`overall-grade-whatif-${courseIndex}`] ?? workingCourse.grade.toFixed(2)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const key = `overall-grade-whatif-${courseIndex}`;
+                    // Allow empty, numbers, and decimal point
+                    if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                      // Store the string value for display
+                      setInputValues(prev => ({ ...prev, [key]: value }));
+                      // Update the actual value if it's a complete number
+                      if (value !== "" && value !== "." && !value.endsWith(".")) {
+                        const newGrade = Number(value) || 0;
+                        if (newGrade >= 0 && newGrade <= 100) {
+                          setDraftCourse({ ...workingCourse, grade: newGrade });
+                        }
                       }
                     }
-                  }
-                }}
-                onBlur={(e) => {
-                  const value = e.target.value;
-                  const key = `overall-grade-whatif-${courseIndex}`;
-                  const newGrade = value === "" || value === "." ? 0 : Number(value) || 0;
-                  if (newGrade >= 0 && newGrade <= 100) {
-                    setDraftCourse({ ...workingCourse, grade: newGrade });
-                  }
-                  setInputValues(prev => {
-                    const next = { ...prev };
-                    delete next[key];
-                    return next;
-                  });
-                }}
-                className="w-24 text-xl font-semibold"
-                inputMode="decimal"
-              />
-              <span className="text-xl font-semibold">%</span>
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value;
+                    const key = `overall-grade-whatif-${courseIndex}`;
+                    const newGrade = value === "" || value === "." ? 0 : Number(value) || 0;
+                    if (newGrade >= 0 && newGrade <= 100) {
+                      setDraftCourse({ ...workingCourse, grade: newGrade });
+                    }
+                    setInputValues(prev => {
+                      const next = { ...prev };
+                      delete next[key];
+                      return next;
+                    });
+                  }}
+                  className="w-24 text-xl font-semibold"
+                  inputMode="decimal"
+                />
+                <span className="text-xl font-semibold">%</span>
+              </div>
+              <span className="text-xl font-semibold min-w-10 text-center">
+                {convertGradeToLetter(workingCourse.grade)}
+              </span>
             </div>
           )
         ) : (
           <>
             {!whatIf && (
               <div className="flex items-center gap-2">
-                <span className="text-xl font-semibold">{percentLabel(actualGrade)}</span>
+                <span style={{ viewTransitionName: `course-grade-${courseIndex}` }} className="text-xl font-semibold w-fit">
+                  {percentLabel(actualGrade)}
+                </span>
+                <span style={{ viewTransitionName: `course-letter-${courseIndex}` }} className="text-xl font-semibold min-w-10 text-center w-fit">
+                  {convertGradeToLetter(actualGrade * 100)}
+                </span>
               </div>
             )}
             {whatIf && simulatedGrade !== null && (
@@ -736,6 +783,9 @@ export function CourseCategories({
                   }
                 >
                   {Math.abs(simulatedGrade - actualGrade).toFixed(2).replace(/\.00$/, '')}%
+                </span>
+                <span className="text-xl font-semibold min-w-10 text-center">
+                  {convertGradeToLetter(simulatedGrade * 100)}
                 </span>
               </div>
             )}
@@ -760,6 +810,13 @@ export function CourseCategories({
           if (selectedCategoryIndex === null) return;
           removeCategory(selectedCategoryIndex);
         }}
+      />
+      <CreateCourseModal
+        open={isCourseModalOpen}
+        onOpenChange={setIsCourseModalOpen}
+        gradingPeriodId={gradingPeriodId}
+        editingCourse={normalized}
+        courseIndex={courseIndex}
       />
       <PublishTemplateModal
         open={isPublishModalOpen}

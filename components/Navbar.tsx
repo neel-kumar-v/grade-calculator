@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "next-view-transitions";
 import { usePathname } from "next/navigation";
 import { Authenticated, Unauthenticated, useQuery } from "convex/react";
 import { Weight } from "lucide-react";
@@ -20,7 +20,8 @@ import { SignOut } from "./auth/SignOut";
 import { Button } from "./ui/button";
 import { Settings } from "lucide-react";
 import { SettingsModal } from "./SettingsModal";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { usePageShortcuts } from "../hooks/usePageShortcuts";
 
 interface NavContext {
   depth: number;
@@ -251,6 +252,56 @@ function CourseNavItem({
   );
 }
 
+function NavActions({
+  mobile = false,
+  onAction,
+  onOpenSettings,
+}: {
+  mobile?: boolean;
+  onAction?: () => void;
+  onOpenSettings: () => void;
+}) {
+  const itemClass = mobile ? "w-full justify-start" : undefined;
+
+  return (
+    <>
+      <Authenticated>
+        <Button
+          variant="ghost"
+          size={mobile ? "default" : "icon"}
+          className={mobile ? itemClass : "size-9"}
+          onClick={() => {
+            onOpenSettings();
+            onAction?.();
+          }}
+          aria-label="Settings"
+        >
+          <Settings className="h-4 w-4" />
+          {mobile ? "Settings" : null}
+        </Button>
+      </Authenticated>
+      <ThemeToggle menuStyle={mobile} className={itemClass} />
+      <Unauthenticated>
+        <Button
+          variant="outline"
+          asChild
+          className={itemClass}
+          onClick={onAction}
+        >
+          <Link href="/">Sign In</Link>
+        </Button>
+      </Unauthenticated>
+      <Authenticated>
+        <SignOut
+          variant="ghost"
+          className={itemClass}
+          onClick={onAction}
+        />
+      </Authenticated>
+    </>
+  );
+}
+
 export function Navbar() {
   const {
     depth,
@@ -262,6 +313,20 @@ export function Navbar() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  usePageShortcuts({
+    onSettings: () => setSettingsOpen(true),
+  });
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 768px)");
+    const closeMenu = () => {
+      if (media.matches) setMenuOpen(false);
+    };
+    closeMenu();
+    media.addEventListener("change", closeMenu);
+    return () => media.removeEventListener("change", closeMenu);
+  }, []);
 
   const showCourse =
     depth >= 1 &&
@@ -310,7 +375,11 @@ export function Navbar() {
             </NavigationMenu>
           </div>
 
-          <div className="relative shrink-0">
+          <div className="hidden shrink-0 items-center gap-1 md:flex">
+            <NavActions onOpenSettings={() => setSettingsOpen(true)} />
+          </div>
+
+          <div className="relative shrink-0 md:hidden">
             <button
               type="button"
               className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border hover:bg-accent"
@@ -339,37 +408,11 @@ export function Navbar() {
 
             {menuOpen && (
               <div className="absolute right-0 top-12 z-50 min-w-44 rounded-md border border-border bg-background p-2 shadow-md">
-                <Authenticated>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => {
-                      setSettingsOpen(true);
-                      setMenuOpen(false);
-                    }}
-                  >
-                    <Settings className="h-4 w-4" />
-                    Settings
-                  </Button>
-                </Authenticated>
-                <ThemeToggle menuStyle className="w-full justify-start" />
-                <Unauthenticated>
-                  <Button
-                    variant="outline"
-                    asChild
-                    className="w-full justify-start"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    <Link href="/">Sign In</Link>
-                  </Button>
-                </Unauthenticated>
-                <Authenticated>
-                  <SignOut
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => setMenuOpen(false)}
-                  />
-                </Authenticated>
+                <NavActions
+                  mobile
+                  onOpenSettings={() => setSettingsOpen(true)}
+                  onAction={() => setMenuOpen(false)}
+                />
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
-import Link from "next/link";
+import { Link } from "next-view-transitions";
 import { Calendar, Plus, Pencil } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
@@ -9,6 +9,7 @@ import { CreateGradingPeriodModal } from "./CreateGradingPeriodModal";
 import type { Doc } from "../convex/_generated/dataModel";
 import { getScaleByName, calculateGPA } from "../lib/gpa";
 import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
+import { usePageShortcuts } from "../hooks/usePageShortcuts";
 
 interface GradingPeriodsProps {
   gradingPeriods: Doc<"gradingPeriods">[] | undefined;
@@ -115,6 +116,13 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
   const settings = useQuery(api.settings.get);
   const gradingPeriodName = useGradingPeriodName();
 
+  usePageShortcuts({
+    onNew: () => {
+      setEditingGradingPeriod(null);
+      setIsModalOpen(true);
+    },
+  });
+
   const handleEditGradingPeriod = (gradingPeriod: Doc<"gradingPeriods">) => {
     setEditingGradingPeriod(gradingPeriod);
     setIsModalOpen(true);
@@ -219,20 +227,20 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
                 <div className="p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xl font-semibold">{gradingPeriod.name}</div>
-                      <div className="text-sm text-muted-foreground">
+                      <div style={{ viewTransitionName: `period-title-${gradingPeriod._id}` }} className="text-xl font-semibold w-fit">{gradingPeriod.name}</div>
+                      <div style={{ viewTransitionName: `period-credits-${gradingPeriod._id}` }} className="text-sm text-muted-foreground w-fit">
                         {totalCredits} credit
                         {totalCredits !== 1 ? "s" : ""}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-px">
                       {gpa !== null && (
-                        <div className="text-xl font-semibold">
+                        <div style={{ viewTransitionName: `period-gpa-${gradingPeriod._id}` }} className="text-xl font-semibold w-fit">
                           {isWAM ? gpa.toFixed(2) + "%" : gpa.toFixed(2)}
                         </div>
                       )}
                       {coreGpa !== null && (
-                        <div className="text-sm text-muted-foreground">
+                        <div style={{ viewTransitionName: `period-core-gpa-${gradingPeriod._id}` }} className="text-sm text-muted-foreground w-fit">
                           {isWAM ? coreGpa.toFixed(2) + "%" : coreGpa.toFixed(2)}
                         </div>
                       )}

@@ -114,7 +114,7 @@ export function PublishTemplateModal({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); 
 
     const finalUniversity = showCustomUniversity ? customUniversity.trim() : university.trim();
 

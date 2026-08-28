@@ -203,6 +203,28 @@ export function CreateCourseModal({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    const isModifier = e.ctrlKey || e.metaKey;
+
+    if (isModifier && e.key === "Enter") {
+      e.preventDefault();
+      if (
+        !isSubmitting &&
+        name.trim() &&
+        !(manual && (!gradeNumerator.trim() || !gradeDenominator.trim()))
+      ) {
+        e.currentTarget.requestSubmit();
+      }
+    }
+
+    if (isModifier && (e.key === "Backspace" || e.key === "Delete")) {
+      if (isEditMode && !isSubmitting && courseIndex !== undefined) {
+        e.preventDefault();
+        handleDelete();
+      }
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -212,7 +234,7 @@ export function CreateCourseModal({
             {isEditMode ? "Edit the course details." : "Add a new course to this grading period."}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="course-name">Course Name</Label>

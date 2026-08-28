@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
+import { Link } from "next-view-transitions";
 import { BookOpen, Plus, Pencil } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
 import { CreateCourseModal } from "./CreateCourseModal";
+import { CreateGradingPeriodModal } from "./CreateGradingPeriodModal";
 import type { Doc, Id } from "../convex/_generated/dataModel";
 import { getScaleByName, calculateGPA, convertGradeToLetter } from "../lib/gpa";
 import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
+import { usePageShortcuts } from "../hooks/usePageShortcuts";
 
 interface CoursesProps {
   gradingPeriodId: Id<"gradingPeriods">;
@@ -23,10 +25,21 @@ function calculateTotalCredits(gradingPeriod: Doc<"gradingPeriods">): number {
 
 export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+  const [isGradingPeriodModalOpen, setIsGradingPeriodModalOpen] = useState(false);
   const [editingCourseIndex, setEditingCourseIndex] = useState<number | null>(null);
   const updateGrades = useMutation(api.gradingPeriods.updateGrades);
   const settings = useQuery(api.settings.get);
   const gradingPeriodName = useGradingPeriodName();
+
+  usePageShortcuts({
+    onNew: () => {
+      setEditingCourseIndex(null);
+      setIsCourseModalOpen(true);
+    },
+    onDelete: () => {
+      setIsGradingPeriodModalOpen(true);
+    },
+  });
 
   const scale = useMemo(() => {
     if (!settings) return getScaleByName("STANDARD_4_0");
@@ -92,7 +105,7 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   return (
     <div className="flex flex-col gap-4 w-full container max-w-2xl px-6 mx-auto py-12">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{gradingPeriod.name}</h1>
+        <h1 style={{ viewTransitionName: `period-title-${gradingPeriodId}` }} className="text-2xl font-bold w-fit">{gradingPeriod.name}</h1>
         <Button onClick={() => setIsCourseModalOpen(true)}>
           <Plus className="size-4" />
           Add Course
@@ -104,17 +117,21 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold">{gradingPeriodName.slice(0, -1)} {gpaLabel}</h2>
-              <p className="text-sm text-muted-foreground">
+              <p style={{ viewTransitionName: `period-credits-${gradingPeriodId}` }} className="text-sm text-muted-foreground w-fit">
                 {totalCredits} credit{totalCredits !== 1 ? "s" : ""}
               </p>
             </div>
-            <div className="flex flex-col items-end  gap-2">
-              <div className="text-xl font-bold">
+            <div className="flex flex-col items-end gap-2">
+              <div style={{ viewTransitionName: `period-gpa-${gradingPeriodId}` }} className="text-xl font-bold w-fit">
                 {isWAM ? periodGPA.toFixed(2) + "%" : periodGPA.toFixed(2)}
               </div>
-              <div className="text-sm text-muted-foreground">
-                {periodCoreGPA !== null ? (isWAM ? periodCoreGPA.toFixed(2) + "%" : periodCoreGPA.toFixed(2)) : "N/A"}
-              </div>
+              {periodCoreGPA !== null ? (
+                <div style={{ viewTransitionName: `period-core-gpa-${gradingPeriodId}` }} className="text-sm text-muted-foreground w-fit">
+                  {isWAM ? periodCoreGPA.toFixed(2) + "%" : periodCoreGPA.toFixed(2)}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">N/A</div>
+              )}
             </div>
           </div>
         </div>
@@ -156,19 +173,19 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
                 <div className="p-4 border border-border rounded-lg hover:bg-accent/50 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="text-base font-semibold">{course.name}</div>
-                      <div className="text-sm text-muted-foreground">
+                      <div style={{ viewTransitionName: `course-title-${index}` }} className="text-base font-semibold w-fit">{course.name}</div>
+                      <div style={{ viewTransitionName: `course-credits-${index}` }} className="text-sm text-muted-foreground w-fit">
                         {course.credits} credit
                         {course.credits !== 1 ? "s" : ""}
                       </div>
                     </div>
                     <div className="flex flex-row gap-4">
                       {typeof course.grade === "number" && (
-                        <div className="flex items-center gap-2 text-md font-medium text-muted-foreground">
+                        <div style={{ viewTransitionName: `course-grade-${index}` }} className="flex items-center gap-2 text-md font-medium text-muted-foreground w-fit">
                           {course.grade.toFixed(2)}%
                         </div>
                       )}
-                      <span className="text-xl flex items-center min-w-10 justify-center font-semibold">
+                      <span style={{ viewTransitionName: `course-letter-${index}` }} className="text-xl flex items-center min-w-10 justify-center font-semibold w-fit">
                         {convertGradeToLetter(course.grade)}
                       </span>
                     </div>
@@ -187,7 +204,11 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
         editingCourse={editingCourseIndex !== null ? gradingPeriod.courses[editingCourseIndex] : undefined}
         courseIndex={editingCourseIndex ?? undefined}
       />
+      <CreateGradingPeriodModal
+        open={isGradingPeriodModalOpen}
+        onOpenChange={setIsGradingPeriodModalOpen}
+        editingGradingPeriod={gradingPeriod}
+      />
     </div>
   );
 }
-

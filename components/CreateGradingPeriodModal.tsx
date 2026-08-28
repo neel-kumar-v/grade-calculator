@@ -124,6 +124,24 @@ export function CreateGradingPeriodModal({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    const isModifier = e.ctrlKey || e.metaKey;
+
+    if (isModifier && e.key === "Enter") {
+      e.preventDefault();
+      if (!isSubmitting && name.trim()) {
+        e.currentTarget.requestSubmit();
+      }
+    }
+
+    if (isModifier && (e.key === "Backspace" || e.key === "Delete")) {
+      if (isEditMode && !isSubmitting && editingGradingPeriod) {
+        e.preventDefault();
+        handleDelete();
+      }
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -135,7 +153,7 @@ export function CreateGradingPeriodModal({
               : `Create a new ${gradingPeriodName.toLowerCase().slice(0, -1)} to track your courses and grades.`}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>

@@ -1,4 +1,5 @@
 import { useAuthActions } from "@convex-dev/auth/react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { type VariantProps } from "class-variance-authority";
@@ -22,6 +23,8 @@ export function SignOut({
   onClick?: () => void;
 }) {
   const { signOut } = useAuthActions();
+  const router = useRouter();
+
   return (
     <Button
       variant={variant}
@@ -29,6 +32,7 @@ export function SignOut({
       onClick={async () => {
         try {
           await signOut();
+          router.push("/");
           toast.success("Signed out successfully");
           onClick?.();
         } catch (error) {
