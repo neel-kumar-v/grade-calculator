@@ -27,6 +27,7 @@ interface NavContext {
   depth: number;
   gradingPeriodId: string | null;
   courseIndex: number | null;
+  isTemplateRoute: boolean;
   gradingPeriods:
     | ReturnType<typeof useQuery<typeof api.gradingPeriods.get>>
     | undefined;
@@ -40,7 +41,7 @@ function useNavContext(): NavContext {
   const segments = pathname.split("/").filter(Boolean);
 
   // Check if this is a template route
-  const isTemplateRoute = segments[0] === "template";
+  const isTemplateRoute = segments[0] === "template" || segments[0] === "templates";
 
   const depth = segments.length;
   // Only treat as gradingPeriodId if it's not a template route
@@ -64,6 +65,7 @@ function useNavContext(): NavContext {
     depth,
     gradingPeriodId,
     courseIndex,
+    isTemplateRoute,
     gradingPeriods,
     currentGradingPeriod,
   };
@@ -74,6 +76,7 @@ function GradingPeriodNavItem({
   gradingPeriodId,
   gradingPeriods,
   currentGradingPeriod,
+  isTemplateRoute,
 }: {
   depth: number;
   gradingPeriodId: string | null;
@@ -83,12 +86,13 @@ function GradingPeriodNavItem({
   currentGradingPeriod:
     | ReturnType<typeof useQuery<typeof api.gradingPeriods.getById>>
     | undefined;
+  isTemplateRoute?: boolean;
 }) {
   const gradingPeriodName = useGradingPeriodName();
   const hasList = Array.isArray(gradingPeriods) && gradingPeriods.length > 0;
-  const isRootPage = depth === 0;
+  const isRootPage = depth === 0 || isTemplateRoute;
   
-  // On root page, show grading period name without a link
+  // On root page or template pages, show grading period name with dropdown
   if (isRootPage) {
     return (
       <NavigationMenuItem>
@@ -307,6 +311,7 @@ export function Navbar() {
     depth,
     gradingPeriodId,
     courseIndex,
+    isTemplateRoute,
     gradingPeriods,
     currentGradingPeriod,
   } = useNavContext();
@@ -361,6 +366,7 @@ export function Navbar() {
                   gradingPeriodId={gradingPeriodId}
                   gradingPeriods={gradingPeriods}
                   currentGradingPeriod={currentGradingPeriod}
+                  isTemplateRoute={isTemplateRoute}
                 />
 
                 {showCourse && (

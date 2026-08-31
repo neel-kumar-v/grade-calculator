@@ -195,6 +195,8 @@ export function CreateCourseModal({
       toast.success("Course deleted successfully");
       onOpenChange(false);
       resetForm();
+      // Navigate back to home page after deletion
+      router.push("/");
     } catch (error) {
       console.error("Failed to delete course:", error);
       toast.error("Failed to delete course. Please try again.");
@@ -231,8 +233,7 @@ export function CreateCourseModal({
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Course" : "Add Course"}</DialogTitle>
           <DialogDescription>
-            {isEditMode ? "Edit the course details." : "Add a new course to this grading period."}
-          </DialogDescription>
+            {isEditMode ? "Edit the course details." : "Add a new course to this grading period."}\n          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
           <div className="space-y-4 py-4">
