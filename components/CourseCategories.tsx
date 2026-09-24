@@ -20,6 +20,10 @@ import { CategoryInputs, renderCategoryGradeDisplay } from "./CategoryInputs";
 import { Plus, Pencil, TriangleAlert, Download, Upload } from "lucide-react";
 import { convertGradeToLetter } from "../lib/gpa";
 import { usePageShortcuts } from "../hooks/usePageShortcuts";
+import {
+  categoryGrade as sharedCategoryGrade,
+  finalCourseGrade as sharedFinalCourseGrade,
+} from "../lib/gradeCalculations";
 
 type GradingPeriod = Doc<"gradingPeriods">;
 type Course = GradingPeriod["courses"][number];
@@ -68,86 +72,12 @@ function normalizeCourse(course: Course): Course {
   };
 }
 
-function assignmentPercent(a: Assignment): number {
-  if (!a || a.max_score <= 0) return 0;
-  return a.score / a.max_score;
-}
-
 function categoryGrade(category: Category, allCategories?: Category[]): number {
-  if (!category) return 0;
-  if (category.manual) {
-    return category.grade / 100;
-  }
-  let assignments = [...(category.assignments ?? [])];
-  if (!assignments.length) return 0;
-
-  // Apply drop policy if configured
-  try {
-    if (!category.drop_policy) throw new Error();
-    const dropCount = category.drop_policy.drop_count;
-    if (dropCount <= 0 || assignments.length <= dropCount) throw new Error();
-    
-    const withIndices = assignments.map((a, idx) => ({ 
-      assignment: a, 
-      index: idx 
-    }));
-    withIndices.sort((a, b) => {
-      const percentA = assignmentPercent(a.assignment);
-      const percentB = assignmentPercent(b.assignment);
-      return percentA - percentB;
-    });
-
-    // Get the lowest N assignment indices to drop/replace
-    const toDropIndices = new Set(withIndices.slice(0, dropCount).map(item => item.index));
-
-    if (category.drop_policy.drop_with === undefined) assignments = assignments.filter((_, idx) => !toDropIndices.has(idx));
-    else {
-      const replaceCategoryIndex = category.drop_policy.drop_with;
-      if (!allCategories || !allCategories[replaceCategoryIndex]) throw new Error();
-
-      const replaceCategory = allCategories[replaceCategoryIndex];
-      const replaceGrade = categoryGrade(replaceCategory, allCategories);
-
-      assignments = assignments.map((assignment, idx) => {
-        if (!toDropIndices.has(idx)) return assignment;
-        return {
-          score: replaceGrade * assignment.max_score,
-          max_score: assignment.max_score,
-        };
-      });
-    }
-  } catch {
-    // Skip drop policy processing used as a continue
-  }
-
-  if (category.evenly_weighted) {
-    const avg =
-      assignments.reduce((sum, a) => sum + assignmentPercent(a), 0) /
-      assignments.length;
-    return avg;
-  }
-  const sumScore = assignments.reduce((s, a) => s + a.score, 0);
-  const sumMax = assignments.reduce((s, a) => s + a.max_score, 0);
-  return sumMax > 0 ? sumScore / sumMax : 0;
+  return sharedCategoryGrade(category as never, allCategories as never);
 }
 
 function finalCourseGrade(course: Course): number {
-  const categories = course.categories ?? [];
-  if (!categories.length) return 0;
-
-  let numerator = 0;
-  let denominator = 0;
-  for (const cat of categories) {
-    const grade = categoryGrade(cat, categories);
-    if (cat.extra_credit) {
-      numerator += cat.weight * grade;
-    } else {
-      numerator += cat.weight * grade;
-      denominator += cat.weight;
-    }
-  }
-  if (denominator <= 0) return 0;
-  return numerator / denominator;
+  return sharedFinalCourseGrade((course.categories ?? []) as never);
 }
 
 export function CourseCategories({
