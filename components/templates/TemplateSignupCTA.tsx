@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { Unauthenticated } from "convex/react";
@@ -13,95 +14,29 @@ import {
   DialogContent,
   DialogTitle,
 } from "../ui/dialog";
+import { toast } from "sonner";
+import { loadTemplateDraft, migrateLegacyTemplateSessionDraft } from "../../lib/templateDraft";
 
-export function TemplateSignupCTA() {
+interface TemplateSignupCTAProps {
+  templateId: string;
+}
+
+function getDefaultPeriodName(settingsName?: "Semesters" | "Trimesters" | "Quarters") {
+  const plural = settingsName ?? "Semesters";
+  const singular = plural.endsWith("s") ? plural.slice(0, -1) : plural;
+  return `${singular} 1`;
+}
+
+export function TemplateSignupCTA({ templateId }: TemplateSignupCTAProps) {
   const router = useRouter();
   const updateSettings = useMutation(api.settings.update);
+  const createGradingPeriod = useMutation(api.gradingPeriods.create);
+  const addCourse = useMutation(api.gradingPeriods.addCourse);
   const settings = useQuery(api.settings.get);
 
   const [showSignIn, setShowSignIn] = useState(false);
-  const [wasUnauthenticated, setWasUnauthenticated] = useState(true);
-
-  // Check authentication state and handle post-signup flow
-  useEffect(() => {
-    const checkAuthAndProcess = async () => {
-      // If we were unauthenticated and now we're authenticated, save template data and redirect
-      if (!wasUnauthenticated) return;
-
-      const stored = sessionStorage.getItem("templateCourseData");
-      const templateData = sessionStorage.getItem("templateTemplateData");
-      if (stored && templateData && settings !== undefined) {
-        // User is now authenticated (settings loaded)
-        try {
-          const courseData = JSON.parse(stored);
-          const templateInfo = JSON.parse(templateData);
-          
-          // Update user's university setting with retry logic
-          // Wait a bit for user record to be fully created after signup
-          if (templateInfo.university && (!settings?.university || settings.university !== templateInfo.university)) {
-            let retries = 3;
-            let success = false;
-              while (retries > 0 && !success) {
-                try {
-                  await updateSettings({ university: templateInfo.university });
-                  success = true;
-                } catch (error: unknown) {
-                  // If it's a null _id error, wait and retry
-                  const message = error instanceof Error ? error.message : "";
-                  if (message.includes("_id") || message.includes("null")) {
-                    retries--;
-                    if (retries > 0) {
-                      await new Promise(resolve => setTimeout(resolve, 500));
-                  }
-                } else {
-                  // Other errors, don't retry
-                  throw error;
-                }
-              }
-            }
-          }
-          
-          // Save template data for tour
-          sessionStorage.setItem("templateTourData", JSON.stringify({
-            courseName: courseData.name,
-            university: templateInfo.university,
-          }));
-          
-          // Set flag to start tour
-          sessionStorage.setItem("startTemplateTour", "true");
-          sessionStorage.setItem("isNewUser", "true");
-          
-          // Clear template course data (we'll import it during tour)
-          sessionStorage.removeItem("templateCourseData");
-          sessionStorage.removeItem("templateTemplateData");
-          
-          // Close sign in modal
-          setShowSignIn(false);
-          
-          // Redirect to root to start tour after a delay to ensure auth state is updated
-          setTimeout(() => {
-            router.push("/");
-          }, 300);
-        } catch (e) {
-          console.error("Failed to parse stored data:", e);
-        }
-      }
-    };
-
-    if (settings !== null) {
-      // User is authenticated
-      if (wasUnauthenticated) {
-        // Add a small delay to ensure user record is fully created
-        setTimeout(() => {
-          checkAuthAndProcess();
-        }, 100);
-      }
-      setWasUnauthenticated(false);
-    } else if (settings === null) {
-      // User is not authenticated
-      setWasUnauthenticated(true);
-    }
-  }, [settings, wasUnauthenticated, updateSettings, router]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   const handleSaveGrades = () => {
     setShowSignIn(true);
@@ -111,33 +46,105 @@ export function TemplateSignupCTA() {
     setShowSignIn(false);
   };
 
+  const handleAuthSuccess = async () => {
+    const draft =
+      loadTemplateDraft(templateId) ??
+      migrateLegacyTemplateSessionDraft(templateId, {
+        university: "",
+        courseCode: "",
+        courseTitle: "",
+        instructor: "",
+      });
+
+    if (!draft) {
+      toast.error("Could not find your template progress to import.");
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      if (
+        draft.university &&
+        (!settings?.university || settings.university !== draft.university)
+      ) {
+        await updateSettings({ university: draft.university });
+      }
+
+      const gradingPeriodId = await createGradingPeriod({
+        name: getDefaultPeriodName(settings?.gradingPeriodName),
+        isCompleted: false,
+        courses: [],
+      });
+
+      const courseResult = await addCourse({
+        id: gradingPeriodId,
+        course: draft.course,
+      });
+
+      setShowSignIn(false);
+      router.push(`/${gradingPeriodId}/${courseResult.courseIndex}`);
+    } catch (error) {
+      console.error("Failed to import template draft:", error);
+      toast.error("Could not import your template yet. Please try again.");
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   return (
     <>
       <Unauthenticated>
-        <div className="fixed animate-in fade-in-0 duration-300 fade-out-0 bottom-0 left-0 right-0 z-50 p-4 bg-transparent flex justify-end items-center shadow-lg">
-          <Card className="max-w-2xl min-w-[25vw]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-xl">Save Your Grade</CardTitle>
-              <CardDescription className="text-sm text-muted-foreground">Sign up to save your grades and unlock What-if mode!</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-end gap-2">
-                {/* <p className="text-sm text-muted-foreground">
-                  Sign up to save your grades
-                </p> */}
-                <Button variant="outline">I&apos;d rather forget 😭</Button>
-                <Button onClick={handleSaveGrades}>Save Grades</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {!dismissed && (
+          <div className="fixed animate-in fade-in-0 duration-300 bottom-4 right-4 z-50 pointer-events-none">
+            <Card className="w-[340px] pointer-events-auto shadow-lg">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Save your progress</CardTitle>
+                <CardDescription className="text-xs text-muted-foreground">
+                  Sign up to save these grades and keep editing later.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setDismissed(true)}>
+                    Maybe later
+                  </Button>
+                  <Button onClick={handleSaveGrades} size="sm">
+                    Save grades
+                  </Button>
+                </div>
+                <Link
+                  href="/template"
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                >
+                  Find more templates
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </Unauthenticated>
 
       <Dialog open={showSignIn} onOpenChange={handleSignInClose}>
-        <DialogContent className="max-w-md bg-card">
+        <DialogContent className="max-w-sm bg-card">
           <DialogTitle className="sr-only">Sign Up</DialogTitle>
-          <SignIn initialStep="signUp" />
+          <div className="space-y-2">
+            <SignIn
+              initialStep="signUp"
+              disableDefaultPostSignupRedirect
+              onAuthSuccess={handleAuthSuccess}
+            />
+            <div className="flex items-center justify-between px-1">
+              <Link
+                href="/template"
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Find more templates
+              </Link>
+              {isImporting && (
+                <span className="text-xs text-muted-foreground">Importing...</span>
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 

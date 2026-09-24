@@ -1,7 +1,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Authenticated, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
@@ -19,9 +19,15 @@ import {
 
 interface SignInProps {
   initialStep?: "signIn" | "signUp";
+  disableDefaultPostSignupRedirect?: boolean;
+  onAuthSuccess?: (flow: "signIn" | "signUp") => void | Promise<void>;
 }
 
-export function SignIn({ initialStep = "signIn" }: SignInProps) {
+export function SignIn({
+  initialStep = "signIn",
+  disableDefaultPostSignupRedirect = false,
+  onAuthSuccess,
+}: SignInProps) {
   const { signIn } = useAuthActions();
   const router = useRouter();
   const [step, setStep] = useState<"signUp" | "signIn">(initialStep);
@@ -58,8 +64,12 @@ export function SignIn({ initialStep = "signIn" }: SignInProps) {
           event.preventDefault();
           const formData = new FormData(event.currentTarget);
           try {
+            const currentFlow = step;
             await signIn("password", formData);
-            if (step === "signUp") {
+            if (onAuthSuccess) {
+              await onAuthSuccess(currentFlow);
+            }
+            if (currentFlow === "signUp" && !disableDefaultPostSignupRedirect) {
               setJustSignedUp(true);
             }
           } catch (error) {

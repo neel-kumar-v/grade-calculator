@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
@@ -251,6 +252,12 @@ export function ImportTemplateModal({
           <DialogDescription>
             Search for course templates to import category structures.
           </DialogDescription>
+          <Link
+            href="/template"
+            className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+          >
+            Find more templates
+          </Link>
         </DialogHeader>
 
         <div className="space-y-4 shrink-0">
@@ -321,4 +328,3 @@ export function ImportTemplateModal({
     </Dialog>
   );
 }
-
