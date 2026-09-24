@@ -13,7 +13,16 @@ import {
   AccordionTrigger,
 } from "../../../components/ui/accordion";
 import { CategoryInputs, renderCategoryGradeDisplay } from "../../../components/CategoryInputs";
+import {
+  loadTemplateDraft,
+  migrateLegacyTemplateSessionDraft,
+  saveTemplateDraft,
+} from "../../../lib/templateDraft";
 import type { Doc } from "../../../convex/_generated/dataModel";
+import {
+  categoryGrade as sharedCategoryGrade,
+  finalCourseGrade as sharedFinalCourseGrade,
+} from "../../../lib/gradeCalculations";
 
 type Template = Doc<"templates">;
 type Category = Template["categories"][number];
@@ -27,74 +36,15 @@ interface PageProps {
   params: Promise<PageParams>;
 }
 
-function assignmentPercent(a: Assignment): number {
-  if (!a || a.max_score <= 0) return 0;
-  return a.score / a.max_score;
-}
-
-function categoryGrade(category: Category & { assignments?: Assignment[] }): number {
-  if (!category) return 0;
-  if (category.manual) {
-    return category.grade / 100;
-  }
-  let assignments = [...(category.assignments ?? [])];
-  if (!assignments.length) return 0;
-
-  // Apply drop policy if configured
-  try {
-    if (!category.drop_policy) throw new Error();
-    const dropCount = category.drop_policy.drop_count;
-    if (dropCount <= 0 || assignments.length <= dropCount) throw new Error();
-    
-    const withIndices = assignments.map((a, idx) => ({ 
-      assignment: a, 
-      index: idx 
-    }));
-    withIndices.sort((a, b) => {
-      const percentA = assignmentPercent(a.assignment);
-      const percentB = assignmentPercent(b.assignment);
-      return percentA - percentB;
-    });
-
-    const toDropIndices = new Set(withIndices.slice(0, dropCount).map(item => item.index));
-
-    if (category.drop_policy.drop_with === undefined) {
-      assignments = assignments.filter((_, idx) => !toDropIndices.has(idx));
-    } else {
-      // For template pages, we'll skip replacement logic as it's complex without all categories
-      assignments = assignments.filter((_, idx) => !toDropIndices.has(idx));
-    }
-  } catch {
-    // Skip drop policy processing
-  }
-
-  if (category.evenly_weighted) {
-    const avg =
-      assignments.reduce((sum, a) => sum + assignmentPercent(a), 0) /
-      assignments.length;
-    return avg;
-  }
-  const sumScore = assignments.reduce((s, a) => s + a.score, 0);
-  const sumMax = assignments.reduce((s, a) => s + a.max_score, 0);
-  return sumMax > 0 ? sumScore / sumMax : 0;
+function categoryGrade(
+  category: Category & { assignments?: Assignment[] },
+  allCategories?: (Category & { assignments?: Assignment[] })[]
+): number {
+  return sharedCategoryGrade(category as never, allCategories as never);
 }
 
 function finalCourseGrade(categories: Category[]): number {
-  if (!categories.length) return 0;
-
-  let numerator = 0;
-  let denominator = 0;
-  for (const cat of categories) {
-    const grade = categoryGrade(cat as Category & { assignments?: Assignment[] });
-    if (cat.extra_credit) {
-      numerator += cat.weight * grade;
-    } else {
-      numerator += cat.weight * grade;
-      denominator += cat.weight;
-    }
-  }
-  if (denominator <= 0) return 0;
-  return numerator / denominator;
+  return sharedFinalCourseGrade(categories as never);
 }
 
 export default function TemplatePage({ params }: PageProps) {
@@ -111,6 +61,14 @@ export default function TemplatePage({ params }: PageProps) {
   // Initialize local state from template and increment download count
   useEffect(() => {
     if (template) {
+      const migratedDraft = migrateLegacyTemplateSessionDraft(templateId, {
+        university: template.university,
+        courseCode: template.courseCode,
+        courseTitle: template.courseTitle,
+        instructor: template.instructor,
+      });
+      const localDraft = loadTemplateDraft(templateId) ?? migratedDraft;
+
       const initialized = template.categories.map((cat) => {
         if (cat.manual) {
           return { ...cat, grade: 100, assignments: undefined };
@@ -122,10 +80,18 @@ export default function TemplatePage({ params }: PageProps) {
           };
         }
       });
-      setLocalCategories(initialized);
+
+      if (
+        localDraft?.course?.categories &&
+        localDraft.course.categories.length === template.categories.length
+      ) {
+        setLocalCategories(localDraft.course.categories as (Category & { assignments?: Assignment[] })[]);
+      } else {
+        setLocalCategories(initialized);
+      }
       setHasChanges(false);
     }
-  }, [template]);
+  }, [template, templateId]);
 
   // Track changes
   useEffect(() => {
@@ -146,28 +112,29 @@ export default function TemplatePage({ params }: PageProps) {
       });
       setHasChanges(hasAnyChange);
 
-      // Store in sessionStorage when changes detected
-      if (hasAnyChange) {
-        const courseData = {
+      const categoriesWithComputedGrades = localCategories.map((cat) => ({
+        ...cat,
+        grade: cat.manual ? cat.grade : categoryGrade(cat, localCategories) * 100,
+      }));
+      saveTemplateDraft({
+        templateId,
+        university: template.university,
+        courseCode: template.courseCode,
+        courseTitle: template.courseTitle,
+        instructor: template.instructor,
+        course: {
           name: `${template.courseCode} - ${template.courseTitle}`,
-          credits: 3, // Default, user can change later
+          credits: 3,
           manual: false,
-          grade: 0,
-          categories: localCategories.map((cat) => ({
-            ...cat,
-            grade: cat.manual ? cat.grade : categoryGrade(cat) * 100,
-          })),
-        };
-        sessionStorage.setItem("templateCourseData", JSON.stringify(courseData));
-        // Also store template metadata for signup flow
-        sessionStorage.setItem("templateTemplateData", JSON.stringify({
-          university: template.university,
-          courseCode: template.courseCode,
-          courseTitle: template.courseTitle,
-        }));
-      }
+          grade: finalCourseGrade(categoriesWithComputedGrades) * 100,
+          from_extra_credit: 0,
+          part_of_degree: false,
+          categories: categoriesWithComputedGrades,
+        },
+        updatedAt: Date.now(),
+      });
     }
-  }, [localCategories, template]);
+  }, [localCategories, template, templateId]);
 
   const updateCategory = (
     catIndex: number,
@@ -251,8 +218,11 @@ export default function TemplatePage({ params }: PageProps) {
     return `${num.toFixed(2).replace(/\.00$/, "")}%`;
   };
 
-  const categoryGradeFn = (cat: Category & { assignments?: Assignment[] }) => {
-    return categoryGrade(cat);
+  const categoryGradeFn = (
+    cat: Category & { assignments?: Assignment[] },
+    allCats?: (Category & { assignments?: Assignment[] })[]
+  ) => {
+    return categoryGrade(cat, allCats ?? localCategories);
   };
 
   return (
@@ -315,8 +285,7 @@ export default function TemplatePage({ params }: PageProps) {
         </div>
       </div>
 
-      {hasChanges && <TemplateSignupCTA />}
+      {hasChanges && <TemplateSignupCTA templateId={template._id} />}
     </div>
   );
 }
-
