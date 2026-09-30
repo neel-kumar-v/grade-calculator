@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -185,11 +184,6 @@ export function CreateCategoryModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Category" : "Add Category"}</DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Edit how this category contributes to your course grade."
-              : "Define how this category contributes to your course grade."}
-          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
           <div className="space-y-2">
