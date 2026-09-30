@@ -18,6 +18,7 @@ import { Label } from "../ui/label";
 import { Combobox } from "../ui/combobox";
 import { toast } from "sonner";
 import type { Doc } from "../../convex/_generated/dataModel";
+import { templateSeedAssignmentForKind } from "../../lib/categoryKinds";
 
 type GradingPeriod = Doc<"gradingPeriods">;
 type Course = GradingPeriod["courses"][number];
@@ -157,7 +158,7 @@ export function PublishTemplateModal({
         return {
           ...categoryData,
           grade: 0, // Reset grade
-          assignments: cat.manual ? undefined : [{ score: 100, max_score: 100 }], // Reset assignments
+          assignments: cat.manual ? undefined : [templateSeedAssignmentForKind(cat.kind)],
         } as Category;
       });
 
