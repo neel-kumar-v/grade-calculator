@@ -296,13 +296,23 @@ export function CategoryInputs({
   }
 
   if (kind === "attendance") {
-    const sessions = category.assignments ?? [];
-    const present = sessions.filter((a) => a.score > 0).length;
+    const classes = category.assignments ?? [];
+    const present = classes.filter((a) => a.score > 0).length;
+    const addCount = Math.max(
+      1,
+      Math.floor(Number(inputValues[`add-count-${catIndex}`] ?? "1") || 1)
+    );
+    const removeCount = Math.max(
+      1,
+      Math.floor(Number(inputValues[`remove-count-${catIndex}`] ?? "1") || 1)
+    );
+    const clampedRemove = Math.min(removeCount, classes.length);
+
     return (
       <div className="space-y-3">
         <div className="flex items-center gap-4 flex-wrap">
           <span className="text-sm text-muted-foreground">
-            {present} / {sessions.length} present
+            {present} / {classes.length} present
           </span>
           <div className="flex items-center gap-2">
             <Label className="text-sm whitespace-nowrap">Drop lowest:</Label>
@@ -331,16 +341,20 @@ export function CategoryInputs({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {sessions.map((assignment, assignIndex) => {
-            const presentSession = assignment.score > 0;
+          {classes.map((assignment, assignIndex) => {
+            const presentClass = assignment.score > 0;
+            const classNumber = assignIndex + 1;
             return (
               <label
                 key={assignIndex}
-                title={`Session ${assignIndex + 1}${presentSession ? " · Present" : " · Absent"}`}
-                className="group relative flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted/40"
+                title={`Class ${classNumber}${presentClass ? " · Present" : " · Absent"}`}
+                className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
               >
+                <span className="min-w-4 text-center text-xs text-muted-foreground tabular-nums">
+                  {classNumber}
+                </span>
                 <Checkbox
-                  checked={presentSession}
+                  checked={presentClass}
                   onCheckedChange={(v) => {
                     const checked = v === true;
                     onUpdateAssignment(catIndex, assignIndex, () => ({
@@ -348,33 +362,105 @@ export function CategoryInputs({
                       max_score: 1,
                     }));
                   }}
-                  aria-label={`Session ${assignIndex + 1}`}
+                  aria-label={`Class ${classNumber}`}
                 />
-                <button
-                  type="button"
-                  className="absolute -right-1.5 -top-1.5 hidden size-4 items-center justify-center rounded-full bg-destructive text-[10px] leading-none text-destructive-foreground group-hover:flex"
-                  aria-label={`Remove session ${assignIndex + 1}`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onRemoveAssignment(catIndex, assignIndex);
-                  }}
-                >
-                  ×
-                </button>
               </label>
             );
           })}
         </div>
 
-        <AddItemsButton
-          catIndex={catIndex}
-          inputValues={inputValues}
-          setInputValues={setInputValues}
-          onAddAssignment={onAddAssignment}
-          singular="session"
-          plural="sessions"
-        />
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-3/4 justify-center gap-2"
+            onClick={() => {
+              const n = Math.max(1, Math.min(100, addCount));
+              for (let i = 0; i < n; i += 1) {
+                onAddAssignment(catIndex);
+              }
+              setInputValues((prev) => ({
+                ...prev,
+                [`add-count-${catIndex}`]: "1",
+              }));
+            }}
+          >
+            <Plus className="size-4" />
+            <span>Add</span>
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={inputValues[`add-count-${catIndex}`] ?? "1"}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const value = e.target.value;
+                const key = `add-count-${catIndex}`;
+                if (value === "" || /^\d+$/.test(value)) {
+                  setInputValues((prev) => ({ ...prev, [key]: value }));
+                }
+              }}
+              onBlur={(e) => {
+                const key = `add-count-${catIndex}`;
+                const parsed = Math.floor(Number(e.target.value) || 1);
+                setInputValues((prev) => ({
+                  ...prev,
+                  [key]: String(Math.max(1, parsed)),
+                }));
+              }}
+              className="h-7 w-12 bg-background text-center"
+              inputMode="numeric"
+              aria-label="Number of classes to add"
+            />
+            <span>{addCount === 1 ? "class" : "classes"}</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-1/4 justify-center gap-2 text-destructive hover:text-destructive"
+            disabled={classes.length === 0}
+            onClick={() => {
+              const n = Math.max(1, Math.min(classes.length, clampedRemove));
+              onUpdateCategory(catIndex, (c) => ({
+                ...c,
+                assignments: (c.assignments ?? []).slice(0, -n),
+              }));
+              setInputValues((prev) => ({
+                ...prev,
+                [`remove-count-${catIndex}`]: "1",
+              }));
+            }}
+          >
+            <Trash className="size-4" />
+            <span className="hidden sm:inline">Delete</span>
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={inputValues[`remove-count-${catIndex}`] ?? "1"}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const value = e.target.value;
+                const key = `remove-count-${catIndex}`;
+                if (value === "" || /^\d+$/.test(value)) {
+                  setInputValues((prev) => ({ ...prev, [key]: value }));
+                }
+              }}
+              onBlur={(e) => {
+                const key = `remove-count-${catIndex}`;
+                const parsed = Math.floor(Number(e.target.value) || 1);
+                setInputValues((prev) => ({
+                  ...prev,
+                  [key]: String(Math.max(1, parsed)),
+                }));
+              }}
+              className="h-7 w-12 bg-background text-center text-foreground"
+              inputMode="numeric"
+              aria-label="Number of classes to delete from the end"
+            />
+          </Button>
+        </div>
       </div>
     );
   }
