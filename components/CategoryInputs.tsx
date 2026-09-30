@@ -373,7 +373,7 @@ export function CategoryInputs({
           <Button
             type="button"
             variant="outline"
-            className="w-3/4 justify-center gap-2"
+            className="w-1/2 justify-center gap-2"
             onClick={() => {
               const n = Math.max(1, Math.min(100, addCount));
               for (let i = 0; i < n; i += 1) {
@@ -418,7 +418,7 @@ export function CategoryInputs({
           <Button
             type="button"
             variant="outline"
-            className="w-1/4 justify-center gap-2 text-destructive hover:text-destructive"
+            className="w-1/2 justify-center gap-2 text-destructive hover:text-destructive"
             disabled={classes.length === 0}
             onClick={() => {
               const n = Math.max(1, Math.min(classes.length, clampedRemove));
