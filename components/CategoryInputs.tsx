@@ -330,13 +330,14 @@ export function CategoryInputs({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2">
           {sessions.map((assignment, assignIndex) => {
             const presentSession = assignment.score > 0;
             return (
-              <div
+              <label
                 key={assignIndex}
-                className="flex items-center gap-3 border border-border rounded-md px-3 py-2"
+                title={`Session ${assignIndex + 1}${presentSession ? " · Present" : " · Absent"}`}
+                className="group relative flex size-9 items-center justify-center rounded-md border border-border hover:bg-muted/40"
               >
                 <Checkbox
                   checked={presentSession}
@@ -347,37 +348,33 @@ export function CategoryInputs({
                       max_score: 1,
                     }));
                   }}
-                  aria-label={`Session ${assignIndex + 1} present`}
+                  aria-label={`Session ${assignIndex + 1}`}
                 />
-                <span className="text-sm">
-                  Session {assignIndex + 1}
-                  <span className="text-muted-foreground">
-                    {" · "}
-                    {presentSession ? "Present" : "Absent"}
-                  </span>
-                </span>
-                <div className="ml-auto">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onRemoveAssignment(catIndex, assignIndex)}
-                  >
-                    <Trash className="size-4 stroke-destructive" />
-                  </Button>
-                </div>
-              </div>
+                <button
+                  type="button"
+                  className="absolute -right-1.5 -top-1.5 hidden size-4 items-center justify-center rounded-full bg-destructive text-[10px] leading-none text-destructive-foreground group-hover:flex"
+                  aria-label={`Remove session ${assignIndex + 1}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRemoveAssignment(catIndex, assignIndex);
+                  }}
+                >
+                  ×
+                </button>
+              </label>
             );
           })}
-          <AddItemsButton
-            catIndex={catIndex}
-            inputValues={inputValues}
-            setInputValues={setInputValues}
-            onAddAssignment={onAddAssignment}
-            singular="session"
-            plural="sessions"
-          />
         </div>
+
+        <AddItemsButton
+          catIndex={catIndex}
+          inputValues={inputValues}
+          setInputValues={setInputValues}
+          onAddAssignment={onAddAssignment}
+          singular="session"
+          plural="sessions"
+        />
       </div>
     );
   }
