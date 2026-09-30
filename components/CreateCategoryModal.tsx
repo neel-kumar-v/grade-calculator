@@ -327,7 +327,7 @@ export function CreateCategoryModal({
               <div className="flex items-center gap-2">
                 <Label className="text-sm whitespace-nowrap">
                   {kind === "attendance"
-                    ? "Drop lowest sessions:"
+                    ? "Drop lowest classes:"
                     : kind === "points_to_goal"
                       ? "Drop lowest scores:"
                       : "Drop lowest:"}
