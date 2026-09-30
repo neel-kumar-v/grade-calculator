@@ -32,6 +32,7 @@ import {
   PlusCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { templateSeedAssignmentForKind } from "../../lib/categoryKinds";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 
 type Template = Doc<"templates">;
@@ -116,7 +117,7 @@ function TemplateCard({
           return {
             ...cat,
             grade: 0,
-            assignments: [{ score: 100, max_score: 100 }],
+            assignments: [templateSeedAssignmentForKind(cat.kind)],
           };
         }
       });

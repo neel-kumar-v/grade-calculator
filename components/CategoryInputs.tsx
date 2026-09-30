@@ -12,6 +12,11 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Plus, Trash } from "lucide-react";
+import {
+  resolveCategoryKind,
+  type CategoryKind,
+} from "../lib/categoryKinds";
+import { pointsToGoalProgress } from "../lib/gradeCalculations";
 
 type Assignment = { score: number; max_score: number };
 type Category = {
@@ -26,6 +31,8 @@ type Category = {
   manual: boolean;
   grade: number;
   assignments?: Assignment[];
+  kind?: CategoryKind;
+  goal_points?: number;
 };
 
 interface CategoryInputsProps {
@@ -48,6 +55,184 @@ interface CategoryInputsProps {
   normalizedCategories?: Category[];
 }
 
+function ScoreMaxInputs({
+  category,
+  catIndex,
+  assignIndex,
+  assignment,
+  inputValues,
+  setInputValues,
+  onUpdateAssignment,
+  scoreOnly = false,
+}: {
+  category: Category;
+  catIndex: number;
+  assignIndex: number;
+  assignment: Assignment;
+  inputValues: Record<string, string>;
+  setInputValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  onUpdateAssignment: CategoryInputsProps["onUpdateAssignment"];
+  scoreOnly?: boolean;
+}) {
+  return (
+    <>
+      <Input
+        type="text"
+        value={
+          inputValues[`score-${catIndex}-${assignIndex}`] ??
+          String(assignment.score)
+        }
+        onChange={(e) => {
+          const value = e.target.value;
+          const key = `score-${catIndex}-${assignIndex}`;
+          if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+            setInputValues((prev) => ({ ...prev, [key]: value }));
+            if (value !== "" && value !== "." && !value.endsWith(".")) {
+              const numValue = Number(value);
+              if (!isNaN(numValue)) {
+                onUpdateAssignment(catIndex, assignIndex, (a) => ({
+                  ...a,
+                  score: numValue,
+                }));
+              }
+            }
+          }
+        }}
+        onBlur={(e) => {
+          const value = e.target.value;
+          const key = `score-${catIndex}-${assignIndex}`;
+          const numValue = value === "" || value === "." ? 0 : Number(value) || 0;
+          onUpdateAssignment(catIndex, assignIndex, (a) => ({
+            ...a,
+            score: numValue,
+          }));
+          setInputValues((prev) => {
+            const next = { ...prev };
+            delete next[key];
+            return next;
+          });
+        }}
+        className="w-24"
+        inputMode="decimal"
+        aria-label={scoreOnly ? "Points earned" : "Score"}
+      />
+      {!scoreOnly && (
+        <>
+          <span>/</span>
+          <Input
+            type="text"
+            value={
+              inputValues[`max_score-${catIndex}-${assignIndex}`] ??
+              String(assignment.max_score)
+            }
+            onChange={(e) => {
+              const value = e.target.value;
+              const key = `max_score-${catIndex}-${assignIndex}`;
+              if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
+                setInputValues((prev) => ({ ...prev, [key]: value }));
+                if (value !== "" && value !== "." && !value.endsWith(".")) {
+                  const numValue = Number(value);
+                  if (!isNaN(numValue)) {
+                    onUpdateAssignment(catIndex, assignIndex, (a) => ({
+                      ...a,
+                      max_score: Math.max(1, numValue),
+                    }));
+                  }
+                }
+              }
+            }}
+            onBlur={(e) => {
+              const value = e.target.value;
+              const key = `max_score-${catIndex}-${assignIndex}`;
+              const numValue =
+                value === "" || value === "." ? 1 : Math.max(1, Number(value) || 1);
+              onUpdateAssignment(catIndex, assignIndex, (a) => ({
+                ...a,
+                max_score: numValue,
+              }));
+              setInputValues((prev) => {
+                const next = { ...prev };
+                delete next[key];
+                return next;
+              });
+            }}
+            className="w-24"
+            inputMode="decimal"
+            aria-label="Max score"
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+function AddItemsButton({
+  catIndex,
+  inputValues,
+  setInputValues,
+  onAddAssignment,
+  singular,
+  plural,
+}: {
+  catIndex: number;
+  inputValues: Record<string, string>;
+  setInputValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  onAddAssignment: (catIndex: number) => void;
+  singular: string;
+  plural: string;
+}) {
+  const count = Math.max(
+    1,
+    Math.floor(Number(inputValues[`add-count-${catIndex}`] ?? "1") || 1)
+  );
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="w-full justify-center gap-2"
+      onClick={() => {
+        const rawCount = inputValues[`add-count-${catIndex}`] ?? "1";
+        const parsedCount = Math.floor(Number(rawCount) || 1);
+        const n = Math.max(1, Math.min(100, parsedCount));
+        for (let i = 0; i < n; i += 1) {
+          onAddAssignment(catIndex);
+        }
+        setInputValues((prev) => ({
+          ...prev,
+          [`add-count-${catIndex}`]: "1",
+        }));
+      }}
+    >
+      <Plus className="size-4" />
+      <span>Add</span>
+      <Input
+        type="number"
+        min="1"
+        step="1"
+        value={inputValues[`add-count-${catIndex}`] ?? "1"}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          const value = e.target.value;
+          const key = `add-count-${catIndex}`;
+          if (value === "" || /^\d+$/.test(value)) {
+            setInputValues((prev) => ({ ...prev, [key]: value }));
+          }
+        }}
+        onBlur={(e) => {
+          const key = `add-count-${catIndex}`;
+          const parsed = Math.floor(Number(e.target.value) || 1);
+          const clamped = Math.max(1, parsed);
+          setInputValues((prev) => ({ ...prev, [key]: String(clamped) }));
+        }}
+        className="h-7 w-12 bg-background text-center"
+        inputMode="numeric"
+        aria-label={`Number of ${plural} to add`}
+      />
+      <span>{count === 1 ? singular : plural}</span>
+    </Button>
+  );
+}
+
 export function CategoryInputs({
   category,
   catIndex,
@@ -58,11 +243,9 @@ export function CategoryInputs({
   onUpdateAssignment,
   onAddAssignment,
   onRemoveAssignment,
-  categoryGrade,
-  percentLabel,
-  whatIf = false,
-  normalizedCategories = [],
 }: CategoryInputsProps) {
+  const kind = resolveCategoryKind(category.kind);
+
   if (category.manual) {
     return (
       <div className="space-y-3">
@@ -107,6 +290,269 @@ export function CategoryInputs({
           />
           <span>/</span>
           <Input readOnly value={100} className="w-24 bg-muted" />
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "attendance") {
+    const classes = category.assignments ?? [];
+    const present = classes.filter((a) => a.score > 0).length;
+    const addCount = Math.max(
+      1,
+      Math.floor(Number(inputValues[`add-count-${catIndex}`] ?? "1") || 1)
+    );
+    const removeCount = Math.max(
+      1,
+      Math.floor(Number(inputValues[`remove-count-${catIndex}`] ?? "1") || 1)
+    );
+    const clampedRemove = Math.min(removeCount, classes.length);
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-sm text-muted-foreground">
+            {present} / {classes.length} present
+          </span>
+          <div className="flex items-center gap-2">
+            <Label className="text-sm whitespace-nowrap">Drop lowest:</Label>
+            <Input
+              type="number"
+              min="0"
+              step="1"
+              value={category.drop_policy?.drop_count ?? 0}
+              onChange={(e) => {
+                const dropCount = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                onUpdateCategory(catIndex, (c) => ({
+                  ...c,
+                  drop_policy:
+                    dropCount > 0
+                      ? {
+                          drop_count: dropCount,
+                          drop_with: c.drop_policy?.drop_with,
+                        }
+                      : undefined,
+                }));
+              }}
+              className="w-16"
+              inputMode="numeric"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {classes.map((assignment, assignIndex) => {
+            const presentClass = assignment.score > 0;
+            const classNumber = assignIndex + 1;
+            return (
+              <label
+                key={assignIndex}
+                title={`Class ${classNumber}${presentClass ? " · Present" : " · Absent"}`}
+                className="flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
+              >
+                <span className="min-w-4 text-center text-xs text-muted-foreground tabular-nums">
+                  {classNumber}
+                </span>
+                <Checkbox
+                  checked={presentClass}
+                  onCheckedChange={(v) => {
+                    const checked = v === true;
+                    onUpdateAssignment(catIndex, assignIndex, () => ({
+                      score: checked ? 1 : 0,
+                      max_score: 1,
+                    }));
+                  }}
+                  aria-label={`Class ${classNumber}`}
+                />
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-1/2 justify-center gap-2"
+            onClick={() => {
+              const n = Math.max(1, Math.min(100, addCount));
+              for (let i = 0; i < n; i += 1) {
+                onAddAssignment(catIndex);
+              }
+              setInputValues((prev) => ({
+                ...prev,
+                [`add-count-${catIndex}`]: "1",
+              }));
+            }}
+          >
+            <Plus className="size-4" />
+            <span>Add</span>
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={inputValues[`add-count-${catIndex}`] ?? "1"}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const value = e.target.value;
+                const key = `add-count-${catIndex}`;
+                if (value === "" || /^\d+$/.test(value)) {
+                  setInputValues((prev) => ({ ...prev, [key]: value }));
+                }
+              }}
+              onBlur={(e) => {
+                const key = `add-count-${catIndex}`;
+                const parsed = Math.floor(Number(e.target.value) || 1);
+                setInputValues((prev) => ({
+                  ...prev,
+                  [key]: String(Math.max(1, parsed)),
+                }));
+              }}
+              className="h-7 w-12 bg-background text-center"
+              inputMode="numeric"
+              aria-label="Number of classes to add"
+            />
+            <span>{addCount === 1 ? "class" : "classes"}</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-1/2 justify-center gap-2 text-destructive hover:text-destructive"
+            disabled={classes.length === 0}
+            onClick={() => {
+              const n = Math.max(1, Math.min(classes.length, clampedRemove));
+              onUpdateCategory(catIndex, (c) => ({
+                ...c,
+                assignments: (c.assignments ?? []).slice(0, -n),
+              }));
+              setInputValues((prev) => ({
+                ...prev,
+                [`remove-count-${catIndex}`]: "1",
+              }));
+            }}
+          >
+            <Trash className="size-4" />
+            <span className="hidden sm:inline">Delete</span>
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={inputValues[`remove-count-${catIndex}`] ?? "1"}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const value = e.target.value;
+                const key = `remove-count-${catIndex}`;
+                if (value === "" || /^\d+$/.test(value)) {
+                  setInputValues((prev) => ({ ...prev, [key]: value }));
+                }
+              }}
+              onBlur={(e) => {
+                const key = `remove-count-${catIndex}`;
+                const parsed = Math.floor(Number(e.target.value) || 1);
+                setInputValues((prev) => ({
+                  ...prev,
+                  [key]: String(Math.max(1, parsed)),
+                }));
+              }}
+              className="h-7 w-12 bg-background text-center text-foreground"
+              inputMode="numeric"
+              aria-label="Number of classes to delete from the end"
+            />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === "points_to_goal") {
+    const { earned, goal } = pointsToGoalProgress(category);
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-sm text-muted-foreground">
+            {earned.toFixed(2).replace(/\.00$/, "")} / {goal} points
+            {earned >= goal && goal > 0 ? " · goal met" : ""}
+          </span>
+          <div className="flex items-center gap-2">
+            <Label className="text-sm whitespace-nowrap">Goal:</Label>
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={category.goal_points ?? 0}
+              onChange={(e) => {
+                const nextGoal = Math.max(0, Number(e.target.value) || 0);
+                onUpdateCategory(catIndex, (c) => ({
+                  ...c,
+                  goal_points: nextGoal,
+                }));
+              }}
+              className="w-20"
+              inputMode="numeric"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label className="text-sm whitespace-nowrap">Drop lowest:</Label>
+            <Input
+              type="number"
+              min="0"
+              step="1"
+              value={category.drop_policy?.drop_count ?? 0}
+              onChange={(e) => {
+                const dropCount = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                onUpdateCategory(catIndex, (c) => ({
+                  ...c,
+                  drop_policy:
+                    dropCount > 0
+                      ? {
+                          drop_count: dropCount,
+                          drop_with: undefined,
+                        }
+                      : undefined,
+                }));
+              }}
+              className="w-16"
+              inputMode="numeric"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {(category.assignments ?? []).map((assignment, assignIndex) => (
+            <div
+              key={assignIndex}
+              className="flex items-center gap-2 border border-border rounded-md px-3 py-2"
+            >
+              <ScoreMaxInputs
+                category={category}
+                catIndex={catIndex}
+                assignIndex={assignIndex}
+                assignment={assignment}
+                inputValues={inputValues}
+                setInputValues={setInputValues}
+                onUpdateAssignment={onUpdateAssignment}
+              />
+              <div className="ml-auto">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onRemoveAssignment(catIndex, assignIndex)}
+                >
+                  <Trash className="size-4 stroke-destructive" />
+                </Button>
+              </div>
+            </div>
+          ))}
+          <AddItemsButton
+            catIndex={catIndex}
+            inputValues={inputValues}
+            setInputValues={setInputValues}
+            onAddAssignment={onAddAssignment}
+            singular="score"
+            plural="scores"
+          />
         </div>
       </div>
     );
@@ -196,85 +642,14 @@ export function CategoryInputs({
             key={assignIndex}
             className="flex items-center gap-2 border border-border rounded-md px-3 py-2"
           >
-            <Input
-              type="text"
-              value={
-                inputValues[`score-${catIndex}-${assignIndex}`] ??
-                String(assignment.score)
-              }
-              onChange={(e) => {
-                const value = e.target.value;
-                const key = `score-${catIndex}-${assignIndex}`;
-                if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
-                  setInputValues((prev) => ({ ...prev, [key]: value }));
-                  if (value !== "" && value !== "." && !value.endsWith(".")) {
-                    const numValue = Number(value);
-                    if (!isNaN(numValue)) {
-                      onUpdateAssignment(catIndex, assignIndex, (a) => ({
-                        ...a,
-                        score: numValue,
-                      }));
-                    }
-                  }
-                }
-              }}
-              onBlur={(e) => {
-                const value = e.target.value;
-                const key = `score-${catIndex}-${assignIndex}`;
-                const numValue = value === "" || value === "." ? 0 : Number(value) || 0;
-                onUpdateAssignment(catIndex, assignIndex, (a) => ({
-                  ...a,
-                  score: numValue,
-                }));
-                setInputValues((prev) => {
-                  const next = { ...prev };
-                  delete next[key];
-                  return next;
-                });
-              }}
-              className="w-24"
-              inputMode="decimal"
-            />
-            <span>/</span>
-            <Input
-              type="text"
-              value={
-                inputValues[`max_score-${catIndex}-${assignIndex}`] ??
-                String(assignment.max_score)
-              }
-              onChange={(e) => {
-                const value = e.target.value;
-                const key = `max_score-${catIndex}-${assignIndex}`;
-                if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
-                  setInputValues((prev) => ({ ...prev, [key]: value }));
-                  if (value !== "" && value !== "." && !value.endsWith(".")) {
-                    const numValue = Number(value);
-                    if (!isNaN(numValue)) {
-                      onUpdateAssignment(catIndex, assignIndex, (a) => ({
-                        ...a,
-                        max_score: Math.max(1, numValue),
-                      }));
-                    }
-                  }
-                }
-              }}
-              onBlur={(e) => {
-                const value = e.target.value;
-                const key = `max_score-${catIndex}-${assignIndex}`;
-                const numValue =
-                  value === "" || value === "." ? 1 : Math.max(1, Number(value) || 1);
-                onUpdateAssignment(catIndex, assignIndex, (a) => ({
-                  ...a,
-                  max_score: numValue,
-                }));
-                setInputValues((prev) => {
-                  const next = { ...prev };
-                  delete next[key];
-                  return next;
-                });
-              }}
-              className="w-24"
-              inputMode="decimal"
+            <ScoreMaxInputs
+              category={category}
+              catIndex={catIndex}
+              assignIndex={assignIndex}
+              assignment={assignment}
+              inputValues={inputValues}
+              setInputValues={setInputValues}
+              onUpdateAssignment={onUpdateAssignment}
             />
             <div className="ml-auto">
               <Button
@@ -289,57 +664,14 @@ export function CategoryInputs({
             </div>
           </div>
         ))}
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full justify-center gap-2"
-          onClick={() => {
-            const rawCount = inputValues[`add-count-${catIndex}`] ?? "1";
-            const parsedCount = Math.floor(Number(rawCount) || 1);
-            const count = Math.max(1, Math.min(100, parsedCount));
-            for (let i = 0; i < count; i += 1) {
-              onAddAssignment(catIndex);
-            }
-            setInputValues((prev) => ({
-              ...prev,
-              [`add-count-${catIndex}`]: "1",
-            }));
-          }}
-        >
-          <Plus className="size-4" />
-          <span>Add</span>
-          <Input
-            type="number"
-            min="1"
-            step="1"
-            value={inputValues[`add-count-${catIndex}`] ?? "1"}
-            onClick={(e) => e.stopPropagation()}
-            onChange={(e) => {
-              const value = e.target.value;
-              const key = `add-count-${catIndex}`;
-              if (value === "" || /^\d+$/.test(value)) {
-                setInputValues((prev) => ({ ...prev, [key]: value }));
-              }
-            }}
-            onBlur={(e) => {
-              const key = `add-count-${catIndex}`;
-              const parsed = Math.floor(Number(e.target.value) || 1);
-              const clamped = Math.max(1, parsed);
-              setInputValues((prev) => ({ ...prev, [key]: String(clamped) }));
-            }}
-            className="h-7 w-12 bg-background text-center"
-            inputMode="numeric"
-            aria-label="Number of assignments to add"
-          />
-          <span>
-            {(Math.max(
-              1,
-              Math.floor(Number(inputValues[`add-count-${catIndex}`] ?? "1") || 1)
-            ) === 1)
-              ? "assignment"
-              : "assignments"}
-          </span>
-        </Button>
+        <AddItemsButton
+          catIndex={catIndex}
+          inputValues={inputValues}
+          setInputValues={setInputValues}
+          onAddAssignment={onAddAssignment}
+          singular="assignment"
+          plural="assignments"
+        />
       </div>
     </div>
   );
@@ -390,4 +722,3 @@ export function renderCategoryGradeDisplay(
     </div>
   );
 }
-

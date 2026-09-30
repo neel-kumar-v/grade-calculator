@@ -23,6 +23,10 @@ import {
   categoryGrade as sharedCategoryGrade,
   finalCourseGrade as sharedFinalCourseGrade,
 } from "../../../lib/gradeCalculations";
+import {
+  defaultAssignmentForKind,
+  templateSeedAssignmentForKind,
+} from "../../../lib/categoryKinds";
 
 type Template = Doc<"templates">;
 type Category = Template["categories"][number];
@@ -76,7 +80,7 @@ export default function TemplatePage({ params }: PageProps) {
           return {
             ...cat,
             grade: 0,
-            assignments: [{ score: 100, max_score: 100 }],
+            assignments: [templateSeedAssignmentForKind(cat.kind)],
           };
         }
       });
@@ -102,11 +106,14 @@ export default function TemplatePage({ params }: PageProps) {
         if (cat.manual) {
           return cat.grade !== 100;
         } else {
-          return cat.assignments?.some(
-            (a) =>
-              a.score !== 100 ||
-              a.max_score !== 100 ||
-              (original.assignments?.length ?? 0) !== cat.assignments?.length
+          const seed = templateSeedAssignmentForKind(cat.kind);
+          return (
+            (cat.assignments?.length ?? 0) !== (original.assignments?.length ?? 0) ||
+            Boolean(
+              cat.assignments?.some(
+                (a) => a.score !== seed.score || a.max_score !== seed.max_score
+              )
+            )
           );
         }
       });
@@ -166,7 +173,7 @@ export default function TemplatePage({ params }: PageProps) {
   const addAssignment = (catIndex: number) => {
     updateCategory(catIndex, (c) => ({
       ...c,
-      assignments: [...(c.assignments ?? []), { score: 100, max_score: 100 }],
+      assignments: [...(c.assignments ?? []), defaultAssignmentForKind(c.kind)],
     }));
   };
 

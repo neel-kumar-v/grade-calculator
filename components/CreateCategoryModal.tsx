@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "./ui/dialog";
 import { Button } from "./ui/button";
@@ -15,6 +14,13 @@ import { Label } from "./ui/label";
 import { Checkbox } from "./ui/checkbox";
 import { Trash } from "lucide-react";
 import type { Doc } from "../convex/_generated/dataModel";
+import {
+  CATEGORY_KIND_OPTIONS,
+  defaultAssignmentForKind,
+  resolveCategoryKind,
+  type CategoryKind,
+} from "../lib/categoryKinds";
+import { cn } from "../lib/utils";
 
 type GradingPeriod = Doc<"gradingPeriods">;
 type Course = GradingPeriod["courses"][number];
@@ -46,6 +52,8 @@ export function CreateCategoryModal({
   const [manualScore, setManualScore] = useState<number>(100);
   const [manualScoreInput, setManualScoreInput] = useState<string>("");
   const [dropCount, setDropCount] = useState<number>(0);
+  const [kind, setKind] = useState<CategoryKind>("standard");
+  const [goalPoints, setGoalPoints] = useState<number>(400);
 
   const reset = () => {
     setName("");
@@ -56,6 +64,8 @@ export function CreateCategoryModal({
     setManualScore(100);
     setManualScoreInput("");
     setDropCount(0);
+    setKind("standard");
+    setGoalPoints(400);
   };
 
   useEffect(() => {
@@ -70,6 +80,8 @@ export function CreateCategoryModal({
       setManualScore(editingCategory.manual ? editingCategory.grade : 100);
       setManualScoreInput("");
       setDropCount(editingCategory.drop_policy?.drop_count ?? 0);
+      setKind(resolveCategoryKind(editingCategory.kind));
+      setGoalPoints(editingCategory.goal_points ?? 400);
       return;
     }
 
@@ -81,20 +93,49 @@ export function CreateCategoryModal({
     onOpenChange(false);
   };
 
+  const handleKindChange = (next: CategoryKind) => {
+    setKind(next);
+    if (next !== "standard") {
+      setManual(false);
+      setEvenlyWeighted(next === "attendance");
+    }
+  };
+
+  const canSubmit =
+    name.trim().length > 0 &&
+    weight > 0 &&
+    (manual || kind !== "points_to_goal" || goalPoints > 0);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    if (weight <= 0) return;
+    if (!canSubmit) return;
 
     const gradeValue = manual ? manualScore : 0;
+    const resolvedKind = manual ? "standard" : kind;
+    const keepAssignments =
+      isEditMode &&
+      editingCategory &&
+      !manual &&
+      resolveCategoryKind(editingCategory.kind) === resolvedKind
+        ? editingCategory.assignments
+        : undefined;
 
     const base: Category = {
       name: name.trim(),
       weight,
-      evenly_weighted: !manual && evenlyWeighted,
+      evenly_weighted: manual
+        ? false
+        : resolvedKind === "attendance"
+          ? true
+          : resolvedKind === "points_to_goal"
+            ? false
+            : evenlyWeighted,
       extra_credit: extraCredit,
       manual,
       grade: gradeValue,
+      kind: manual ? undefined : resolvedKind === "standard" ? undefined : resolvedKind,
+      goal_points:
+        !manual && resolvedKind === "points_to_goal" ? goalPoints : undefined,
       drop_policy:
         dropCount > 0
           ? {
@@ -105,12 +146,8 @@ export function CreateCategoryModal({
       ...(manual
         ? {}
         : {
-            assignments: (isEditMode ? editingCategory?.assignments : undefined) ?? [
-              {
-                score: 100,
-                max_score: 100,
-              },
-            ],
+            assignments:
+              keepAssignments ?? [defaultAssignmentForKind(resolvedKind)],
           }),
     };
 
@@ -128,7 +165,7 @@ export function CreateCategoryModal({
 
     if (isModifier && e.key === "Enter") {
       e.preventDefault();
-      if (name.trim() && weight > 0) {
+      if (canSubmit) {
         e.currentTarget.requestSubmit();
       }
     }
@@ -147,11 +184,6 @@ export function CreateCategoryModal({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Category" : "Add Category"}</DialogTitle>
-          <DialogDescription>
-            {isEditMode
-              ? "Edit how this category contributes to your course grade."
-              : "Define how this category contributes to your course grade."}
-          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="space-y-4">
           <div className="space-y-2">
@@ -178,6 +210,47 @@ export function CreateCategoryModal({
             />
           </div>
 
+          {!manual && (
+            <div className="space-y-2">
+              <Label>Category type</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {CATEGORY_KIND_OPTIONS.map((option) => {
+                  const selected = kind === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleKindChange(option.value)}
+                      className={cn(
+                        "rounded-md border px-3 py-2 text-center text-sm font-medium transition-colors",
+                        selected
+                          ? "border-foreground bg-muted/60"
+                          : "border-border hover:bg-muted/40"
+                      )}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {kind === "points_to_goal" && !manual && (
+            <div className="space-y-2">
+              <Label htmlFor="goal-points">Goal points</Label>
+              <Input
+                id="goal-points"
+                type="number"
+                min="1"
+                step="1"
+                value={goalPoints}
+                onChange={(e) => setGoalPoints(Math.max(0, Number(e.target.value) || 0))}
+                required
+              />
+            </div>
+          )}
+
           <div className="flex flex-col gap-2">
             <label className="flex items-center gap-2">
               <Checkbox
@@ -188,7 +261,14 @@ export function CreateCategoryModal({
             </label>
 
             <label className="flex items-center gap-2">
-              <Checkbox checked={manual} onCheckedChange={(v) => setManual(v === true)} />
+              <Checkbox
+                checked={manual}
+                onCheckedChange={(v) => {
+                  const next = v === true;
+                  setManual(next);
+                  if (next) setKind("standard");
+                }}
+              />
               <span className="text-sm">Manually set category grade</span>
             </label>
           </div>
@@ -202,7 +282,7 @@ export function CreateCategoryModal({
                   value={manualScoreInput || String(manualScore)}
                   onChange={(e) => {
                     const value = e.target.value;
-                    if (value === "" || /^-?\\d*\\.?\\d*$/.test(value)) {
+                    if (value === "" || /^-?\d*\.?\d*$/.test(value)) {
                       setManualScoreInput(value);
                       if (value !== "" && value !== "." && !value.endsWith(".")) {
                         const numValue = Number(value);
@@ -229,15 +309,23 @@ export function CreateCategoryModal({
             </div>
           ) : (
             <div className="space-y-3">
+              {kind === "standard" && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={evenlyWeighted}
+                    onCheckedChange={(v) => setEvenlyWeighted(v === true)}
+                  />
+                  <span className="text-sm">Assignments are evenly weighted</span>
+                </div>
+              )}
               <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={evenlyWeighted}
-                  onCheckedChange={(v) => setEvenlyWeighted(v === true)}
-                />
-                <span className="text-sm">Assignments are evenly weighted</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-sm whitespace-nowrap">Drop lowest:</Label>
+                <Label className="text-sm whitespace-nowrap">
+                  {kind === "attendance"
+                    ? "Drop lowest classes:"
+                    : kind === "points_to_goal"
+                      ? "Drop lowest scores:"
+                      : "Drop lowest:"}
+                </Label>
                 <Input
                   type="number"
                   min="0"
@@ -250,11 +338,6 @@ export function CreateCategoryModal({
                   className="w-16"
                   inputMode="numeric"
                 />
-                {dropCount > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    (Replacement policy can be configured in category settings)
-                  </span>
-                )}
               </div>
             </div>
           )}
@@ -278,7 +361,7 @@ export function CreateCategoryModal({
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!name.trim() || weight <= 0}>
+              <Button type="submit" disabled={!canSubmit}>
                 {isEditMode ? "Save Edits" : "Create Category"}
               </Button>
             </div>

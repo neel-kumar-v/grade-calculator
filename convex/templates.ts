@@ -39,6 +39,8 @@ export const create = mutation({
               c.evenly_weighted === argCat.evenly_weighted &&
               c.extra_credit === argCat.extra_credit &&
               c.manual === argCat.manual &&
+              (c.kind ?? "standard") === (argCat.kind ?? "standard") &&
+              (c.goal_points ?? null) === (argCat.goal_points ?? null) &&
               JSON.stringify(c.drop_policy) === JSON.stringify(argCat.drop_policy)
             );
           })

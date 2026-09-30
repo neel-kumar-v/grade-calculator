@@ -24,6 +24,11 @@ import {
   categoryGrade as sharedCategoryGrade,
   finalCourseGrade as sharedFinalCourseGrade,
 } from "../lib/gradeCalculations";
+import {
+  defaultAssignmentForKind,
+  resolveCategoryKind,
+  templateSeedAssignmentForKind,
+} from "../lib/categoryKinds";
 
 type GradingPeriod = Doc<"gradingPeriods">;
 type Course = GradingPeriod["courses"][number];
@@ -141,6 +146,8 @@ export function CourseCategories({
         c.evenly_weighted === cur.evenly_weighted &&
         c.extra_credit === cur.extra_credit &&
         c.manual === cur.manual &&
+        resolveCategoryKind(c.kind) === resolveCategoryKind(cur.kind) &&
+        (c.goal_points ?? null) === (cur.goal_points ?? null) &&
         JSON.stringify(c.drop_policy) === JSON.stringify(cur.drop_policy)
       );
     });
@@ -230,14 +237,15 @@ export function CourseCategories({
   };
 
   const addAssignment = (catIndex: number) => {
-    setCategory(catIndex, (c) => ({
-      ...c,
-      assignments: [...(c.assignments ?? []), { score: 100, max_score: 100 }],
-      grade: categoryGrade({
+    setCategory(catIndex, (c) => {
+      const nextAssignment = defaultAssignmentForKind(c.kind);
+      const assignments = [...(c.assignments ?? []), nextAssignment];
+      return {
         ...c,
-        assignments: [...(c.assignments ?? []), { score: 100, max_score: 100 }],
-      }, workingCourse.categories ?? []) * 100,
-    }));
+        assignments,
+        grade: categoryGrade({ ...c, assignments }, workingCourse.categories ?? []) * 100,
+      };
+    });
   };
 
   const updateAssignment = (
@@ -358,7 +366,7 @@ export function CourseCategories({
         return {
           ...cat,
           grade: 0,
-          assignments: [{ score: 100, max_score: 100 }],
+          assignments: [templateSeedAssignmentForKind(cat.kind)],
         } as Category;
       }
     });

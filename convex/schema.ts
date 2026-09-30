@@ -7,6 +7,13 @@ export const assignment = v.object({
   max_score: v.number(),
 });
 
+/** How a category aggregates assignments into a grade. Undefined = standard. */
+export const categoryKind = v.union(
+  v.literal("standard"),
+  v.literal("attendance"),
+  v.literal("points_to_goal"),
+);
+
 export const category = v.object({
   name: v.string(),
   weight: v.number(),
@@ -19,6 +26,10 @@ export const category = v.object({
   manual: v.boolean(),
   grade: v.number(),
   assignments: v.optional(v.array(assignment)),
+  /** Aggregation mode. Missing/undefined means standard weighted/even average. */
+  kind: v.optional(categoryKind),
+  /** Target points for points_to_goal categories (e.g. 400). */
+  goal_points: v.optional(v.number()),
 });
 
 export const course = v.object({
