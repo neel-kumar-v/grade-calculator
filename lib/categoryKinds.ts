@@ -5,41 +5,16 @@ export type Assignment = { score: number; max_score: number };
 export const CATEGORY_KIND_OPTIONS: {
   value: CategoryKind;
   label: string;
-  description: string;
 }[] = [
-  {
-    value: "standard",
-    label: "Standard",
-    description: "Score each assignment out of a max; average or point-weight them.",
-  },
-  {
-    value: "attendance",
-    label: "Attendance",
-    description: "Check off each session. Grade is present ÷ total sessions.",
-  },
-  {
-    value: "points_to_goal",
-    label: "Points to goal",
-    description:
-      "Sum points toward a finish line (e.g. 400). Missed quizzes don’t dilute—just earn less toward the goal.",
-  },
+  { value: "standard", label: "Standard" },
+  { value: "attendance", label: "Attendance" },
+  { value: "points_to_goal", label: "Points to goal" },
 ];
 
 export function resolveCategoryKind(
   kind: CategoryKind | undefined | null
 ): CategoryKind {
   return kind ?? "standard";
-}
-
-export function categoryKindLabel(kind: CategoryKind | undefined | null): string | null {
-  switch (resolveCategoryKind(kind)) {
-    case "attendance":
-      return "Attendance";
-    case "points_to_goal":
-      return "Points to goal";
-    default:
-      return null;
-  }
 }
 
 export function defaultAssignmentForKind(kind: CategoryKind | undefined | null): Assignment {

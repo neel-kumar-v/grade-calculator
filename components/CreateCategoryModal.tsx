@@ -219,7 +219,7 @@ export function CreateCategoryModal({
           {!manual && (
             <div className="space-y-2">
               <Label>Category type</Label>
-              <div className="grid gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {CATEGORY_KIND_OPTIONS.map((option) => {
                   const selected = kind === option.value;
                   return (
@@ -228,14 +228,13 @@ export function CreateCategoryModal({
                       type="button"
                       onClick={() => handleKindChange(option.value)}
                       className={cn(
-                        "rounded-md border px-3 py-2 text-left transition-colors",
+                        "rounded-md border px-3 py-2 text-center text-sm font-medium transition-colors",
                         selected
                           ? "border-foreground bg-muted/60"
                           : "border-border hover:bg-muted/40"
                       )}
                     >
-                      <div className="text-sm font-medium">{option.label}</div>
-                      <div className="text-xs text-muted-foreground">{option.description}</div>
+                      {option.label}
                     </button>
                   );
                 })}
@@ -255,9 +254,6 @@ export function CreateCategoryModal({
                 onChange={(e) => setGoalPoints(Math.max(0, Number(e.target.value) || 0))}
                 required
               />
-              <p className="text-xs text-muted-foreground">
-                Category hits 100% once earned points reach this finish line.
-              </p>
             </div>
           )}
 
@@ -348,11 +344,6 @@ export function CreateCategoryModal({
                   className="w-16"
                   inputMode="numeric"
                 />
-                {dropCount > 0 && kind === "standard" && (
-                  <span className="text-xs text-muted-foreground">
-                    (Replacement policy can be configured in category settings)
-                  </span>
-                )}
               </div>
             </div>
           )}

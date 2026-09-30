@@ -25,7 +25,6 @@ import {
   finalCourseGrade as sharedFinalCourseGrade,
 } from "../lib/gradeCalculations";
 import {
-  categoryKindLabel,
   defaultAssignmentForKind,
   resolveCategoryKind,
   templateSeedAssignmentForKind,
@@ -566,11 +565,6 @@ export function CourseCategories({
                   <span className="text-lg font-medium">{category.name}</span>
                   {category.extra_credit && (
                     <span className="text-xs text-muted-foreground">Extra credit</span>
-                  )}
-                  {categoryKindLabel(category.kind) && (
-                    <span className="text-xs text-muted-foreground">
-                      {categoryKindLabel(category.kind)}
-                    </span>
                   )}
                 </div>
                 <div className="text-lg font-medium">

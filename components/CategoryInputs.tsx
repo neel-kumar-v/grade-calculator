@@ -436,9 +436,6 @@ export function CategoryInputs({
         </div>
 
         <div className="flex flex-col gap-3">
-          <p className="text-xs text-muted-foreground">
-            Enter each quiz score. Only points earned count toward the goal — zeros add nothing and don’t dilute the rest.
-          </p>
           {(category.assignments ?? []).map((assignment, assignIndex) => (
             <div
               key={assignIndex}
