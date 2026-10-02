@@ -4,7 +4,8 @@
   "private": true,
   "packageManager": "pnpm@11.24.0",
   "scripts": {
-    "dev": "xport run next dev",
+    "dev": "node scripts/dev.mjs next dev",
+    "setup": "node scripts/dev.mjs --setup-only",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
