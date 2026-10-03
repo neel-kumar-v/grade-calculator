@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  xport: link:../xport/npm/xport
+
 importers:
 
   .:
@@ -120,6 +123,9 @@ importers:
       typescript:
         specifier: ^5
         version: 5.9.3
+      xport:
+        specifier: link:../xport/npm/xport
+        version: link:../xport/npm/xport
 
 packages:
 
