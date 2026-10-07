@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as gradingPeriods from "../gradingPeriods.js";
 import type * as http from "../http.js";
+import type * as migrations from "../migrations.js";
 import type * as resetPassword from "../resetPassword.js";
 import type * as settings from "../settings.js";
 import type * as templates from "../templates.js";
@@ -26,6 +27,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   gradingPeriods: typeof gradingPeriods;
   http: typeof http;
+  migrations: typeof migrations;
   resetPassword: typeof resetPassword;
   settings: typeof settings;
   templates: typeof templates;
