@@ -99,6 +99,9 @@ export function CreateCategoryModal({
       setManual(false);
       setEvenlyWeighted(next === "attendance");
     }
+    if (next === "points_to_goal") {
+      setDropCount(0);
+    }
   };
 
   const canSubmit =
@@ -144,8 +147,9 @@ export function CreateCategoryModal({
       kind: manual ? undefined : resolvedKind === "standard" ? undefined : resolvedKind,
       goal_points:
         !manual && resolvedKind === "points_to_goal" ? goalPoints : undefined,
+      // Points-to-goal has no drop policy — only sum toward the finish line.
       drop_policy:
-        dropCount > 0
+        !manual && resolvedKind !== "points_to_goal" && dropCount > 0
           ? {
               drop_count: dropCount,
               drop_with: isEditMode ? editingCategory?.drop_policy?.drop_with : undefined,
@@ -326,27 +330,25 @@ export function CreateCategoryModal({
                   <span className="text-sm">Assignments are evenly weighted</span>
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <Label className="text-sm whitespace-nowrap">
-                  {kind === "attendance"
-                    ? "Drop lowest classes:"
-                    : kind === "points_to_goal"
-                      ? "Drop lowest scores:"
-                      : "Drop lowest:"}
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={dropCount}
-                  onChange={(e) => {
-                    const value = Math.max(0, Math.floor(Number(e.target.value) || 0));
-                    setDropCount(value);
-                  }}
-                  className="w-16"
-                  inputMode="numeric"
-                />
-              </div>
+              {kind !== "points_to_goal" && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">
+                    {kind === "attendance" ? "Drop lowest classes:" : "Drop lowest:"}
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={dropCount}
+                    onChange={(e) => {
+                      const value = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                      setDropCount(value);
+                    }}
+                    className="w-16"
+                    inputMode="numeric"
+                  />
+                </div>
+              )}
             </div>
           )}
 

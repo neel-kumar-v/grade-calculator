@@ -1,5 +1,6 @@
 "use client";
 
+import type { Dispatch, FocusEvent, SetStateAction } from "react";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
@@ -40,7 +41,7 @@ interface CategoryInputsProps {
   catIndex: number;
   allCategories: Category[];
   inputValues: Record<string, string>;
-  setInputValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setInputValues: Dispatch<SetStateAction<Record<string, string>>>;
   onUpdateCategory: (catIndex: number, updater: (c: Category) => Category) => void;
   onUpdateAssignment: (
     catIndex: number,
@@ -53,6 +54,20 @@ interface CategoryInputsProps {
   percentLabel: (val: number) => string;
   whatIf?: boolean;
   normalizedCategories?: Category[];
+}
+
+/** Select full value on focus so mobile Next/Previous keyboard bars replace on type. */
+function selectAllOnFocus(e: FocusEvent<HTMLInputElement>) {
+  const el = e.currentTarget;
+  // WebKit (iOS Safari/Brave) often ignores select() synchronously during focus.
+  requestAnimationFrame(() => {
+    el.select();
+    try {
+      el.setSelectionRange(0, el.value.length);
+    } catch {
+      // Some input types reject setSelectionRange.
+    }
+  });
 }
 
 function ScoreMaxInputs({
@@ -70,7 +85,7 @@ function ScoreMaxInputs({
   assignIndex: number;
   assignment: Assignment;
   inputValues: Record<string, string>;
-  setInputValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setInputValues: Dispatch<SetStateAction<Record<string, string>>>;
   onUpdateAssignment: CategoryInputsProps["onUpdateAssignment"];
   scoreOnly?: boolean;
 }) {
@@ -98,6 +113,7 @@ function ScoreMaxInputs({
             }
           }
         }}
+        onFocus={selectAllOnFocus}
         onBlur={(e) => {
           const value = e.target.value;
           const key = `score-${catIndex}-${assignIndex}`;
@@ -112,7 +128,7 @@ function ScoreMaxInputs({
             return next;
           });
         }}
-        className="w-24"
+        className={scoreOnly ? "min-w-0 flex-1" : "w-24"}
         inputMode="decimal"
         aria-label={scoreOnly ? "Points earned" : "Score"}
       />
@@ -141,6 +157,7 @@ function ScoreMaxInputs({
                 }
               }
             }}
+            onFocus={selectAllOnFocus}
             onBlur={(e) => {
               const value = e.target.value;
               const key = `max_score-${catIndex}-${assignIndex}`;
@@ -176,7 +193,7 @@ function AddItemsButton({
 }: {
   catIndex: number;
   inputValues: Record<string, string>;
-  setInputValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setInputValues: Dispatch<SetStateAction<Record<string, string>>>;
   onAddAssignment: (catIndex: number) => void;
   singular: string;
   plural: string;
@@ -467,63 +484,36 @@ export function CategoryInputs({
 
   if (kind === "points_to_goal") {
     const { earned, goal } = pointsToGoalProgress(category);
+    const earnedLabel = earned.toFixed(2).replace(/\.00$/, "");
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-4 flex-wrap">
-          <span className="text-sm text-muted-foreground">
-            {earned.toFixed(2).replace(/\.00$/, "")} / {goal} points
-            {earned >= goal && goal > 0 ? " · goal met" : ""}
+        <div className="flex items-center gap-3">
+          <Input
+            type="number"
+            min="1"
+            step="1"
+            value={category.goal_points ?? 0}
+            onChange={(e) => {
+              const nextGoal = Math.max(0, Number(e.target.value) || 0);
+              onUpdateCategory(catIndex, (c) => ({
+                ...c,
+                goal_points: nextGoal,
+                drop_policy: undefined,
+              }));
+            }}
+            onFocus={selectAllOnFocus}
+            className="w-24"
+            inputMode="numeric"
+            aria-label="Goal points"
+          />
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {earnedLabel} / {goal}
           </span>
-          <div className="flex items-center gap-2">
-            <Label className="text-sm whitespace-nowrap">Goal:</Label>
-            <Input
-              type="number"
-              min="1"
-              step="1"
-              value={category.goal_points ?? 0}
-              onChange={(e) => {
-                const nextGoal = Math.max(0, Number(e.target.value) || 0);
-                onUpdateCategory(catIndex, (c) => ({
-                  ...c,
-                  goal_points: nextGoal,
-                }));
-              }}
-              className="w-20"
-              inputMode="numeric"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Label className="text-sm whitespace-nowrap">Drop lowest:</Label>
-            <Input
-              type="number"
-              min="0"
-              step="1"
-              value={category.drop_policy?.drop_count ?? 0}
-              onChange={(e) => {
-                const dropCount = Math.max(0, Math.floor(Number(e.target.value) || 0));
-                onUpdateCategory(catIndex, (c) => ({
-                  ...c,
-                  drop_policy:
-                    dropCount > 0
-                      ? {
-                          drop_count: dropCount,
-                          drop_with: undefined,
-                        }
-                      : undefined,
-                }));
-              }}
-              className="w-16"
-              inputMode="numeric"
-            />
-          </div>
         </div>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {(category.assignments ?? []).map((assignment, assignIndex) => (
-            <div
-              key={assignIndex}
-              className="flex items-center gap-2 border border-border rounded-md px-3 py-2"
-            >
+            <div key={assignIndex} className="flex items-center gap-2">
               <ScoreMaxInputs
                 category={category}
                 catIndex={catIndex}
@@ -532,17 +522,17 @@ export function CategoryInputs({
                 inputValues={inputValues}
                 setInputValues={setInputValues}
                 onUpdateAssignment={onUpdateAssignment}
+                scoreOnly
               />
-              <div className="ml-auto">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onRemoveAssignment(catIndex, assignIndex)}
-                >
-                  <Trash className="size-4 stroke-destructive" />
-                </Button>
-              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => onRemoveAssignment(catIndex, assignIndex)}
+                aria-label={`Remove score ${assignIndex + 1}`}
+              >
+                <Trash className="size-4 stroke-destructive" />
+              </Button>
             </div>
           ))}
           <AddItemsButton
