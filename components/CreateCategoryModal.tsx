@@ -17,6 +17,7 @@ import type { Doc } from "../convex/_generated/dataModel";
 import {
   CATEGORY_KIND_OPTIONS,
   defaultAssignmentForKind,
+  normalizePointsToGoalAssignments,
   resolveCategoryKind,
   type CategoryKind,
 } from "../lib/categoryKinds";
@@ -127,9 +128,15 @@ export function CreateCategoryModal({
       (previousKind === resolvedKind ||
         (previousKind === "standard" && resolvedKind === "points_to_goal") ||
         (previousKind === "points_to_goal" && resolvedKind === "standard"));
-    const keepAssignments = canReuseAssignments
+    const reused = canReuseAssignments
       ? editingCategory.assignments
       : undefined;
+    const assignments =
+      resolvedKind === "points_to_goal"
+        ? normalizePointsToGoalAssignments(
+            reused ?? [defaultAssignmentForKind(resolvedKind)]
+          )
+        : (reused ?? [defaultAssignmentForKind(resolvedKind)]);
 
     const base: Category = {
       name: name.trim(),
@@ -155,12 +162,7 @@ export function CreateCategoryModal({
               drop_with: isEditMode ? editingCategory?.drop_policy?.drop_with : undefined,
             }
           : undefined,
-      ...(manual
-        ? {}
-        : {
-            assignments:
-              keepAssignments ?? [defaultAssignmentForKind(resolvedKind)],
-          }),
+      ...(manual ? {} : { assignments }),
     };
 
     if (isEditMode) {
