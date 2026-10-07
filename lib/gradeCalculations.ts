@@ -80,8 +80,7 @@ function applyDropPolicy(
 
 /**
  * Points-to-goal: sum earned points toward a finish line.
- * Grade = min(sum(scores), goal) / goal. Individual max_scores are display-only.
- * Drop policy drops the lowest-scoring entries by absolute score before summing.
+ * Grade = min(sum(scores), goal) / goal. max_score and drop policy are ignored.
  */
 function pointsToGoalGrade(
   category: CategoryForGrade,
@@ -90,17 +89,7 @@ function pointsToGoalGrade(
   const goal = category.goal_points ?? 0;
   if (goal <= 0) return 0;
 
-  let working = [...assignments];
-  const dropCount = Math.floor(category.drop_policy?.drop_count ?? 0);
-  if (dropCount > 0 && working.length > 0) {
-    const effectiveDrop = Math.min(dropCount, working.length);
-    // Never drop every entry — that would falsely treat progress as 100%.
-    working = [...working]
-      .sort((a, b) => a.score - b.score)
-      .slice(Math.min(effectiveDrop, working.length - 1));
-  }
-
-  const earned = working.reduce((sum, a) => sum + Math.max(0, a.score), 0);
+  const earned = assignments.reduce((sum, a) => sum + Math.max(0, a.score), 0);
   return Math.min(1, earned / goal);
 }
 
@@ -183,20 +172,15 @@ export function finalCourseGrade(categories: CategoryForGrade[]): number {
   return numerator / denominator;
 }
 
-/** Earned points toward a points-to-goal finish line (after drops). */
+/** Earned points toward a points-to-goal finish line. */
 export function pointsToGoalProgress(category: CategoryForGrade): {
   earned: number;
   goal: number;
 } {
   const goal = category.goal_points ?? 0;
-  let working = [...(category.assignments ?? [])];
-  const dropCount = Math.floor(category.drop_policy?.drop_count ?? 0);
-  if (dropCount > 0 && working.length > 0) {
-    const effectiveDrop = Math.min(dropCount, working.length);
-    working = [...working]
-      .sort((a, b) => a.score - b.score)
-      .slice(effectiveDrop);
-  }
-  const earned = working.reduce((sum, a) => sum + Math.max(0, a.score), 0);
+  const earned = (category.assignments ?? []).reduce(
+    (sum, a) => sum + Math.max(0, a.score),
+    0
+  );
   return { earned, goal };
 }

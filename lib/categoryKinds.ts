@@ -22,7 +22,8 @@ export function defaultAssignmentForKind(kind: CategoryKind | undefined | null):
     case "attendance":
       return { score: 1, max_score: 1 };
     case "points_to_goal":
-      return { score: 0, max_score: 20 };
+      // max_score is unused for this kind; keep schema-valid placeholder only.
+      return { score: 0, max_score: 1 };
     default:
       return { score: 100, max_score: 100 };
   }
@@ -35,8 +36,19 @@ export function templateSeedAssignmentForKind(
     case "attendance":
       return { score: 1, max_score: 1 };
     case "points_to_goal":
-      return { score: 20, max_score: 20 };
+      return { score: 20, max_score: 1 };
     default:
       return { score: 100, max_score: 100 };
   }
+}
+
+/** Keep earned scores; neutralize unused denominators for points-to-goal. */
+export function normalizePointsToGoalAssignments(
+  assignments: Assignment[] | undefined
+): Assignment[] | undefined {
+  if (!assignments) return undefined;
+  return assignments.map((a) => ({
+    score: a.score,
+    max_score: 1,
+  }));
 }
