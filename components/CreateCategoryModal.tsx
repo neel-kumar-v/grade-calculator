@@ -112,13 +112,21 @@ export function CreateCategoryModal({
 
     const gradeValue = manual ? manualScore : 0;
     const resolvedKind = manual ? "standard" : kind;
-    const keepAssignments =
+    const previousKind = isEditMode
+      ? resolveCategoryKind(editingCategory?.kind)
+      : null;
+    // Keep scores when kind is unchanged, or when converting standard ↔ points_to_goal
+    // (both store earned points in assignment.score).
+    const canReuseAssignments =
       isEditMode &&
-      editingCategory &&
+      !!editingCategory &&
       !manual &&
-      resolveCategoryKind(editingCategory.kind) === resolvedKind
-        ? editingCategory.assignments
-        : undefined;
+      (previousKind === resolvedKind ||
+        (previousKind === "standard" && resolvedKind === "points_to_goal") ||
+        (previousKind === "points_to_goal" && resolvedKind === "standard"));
+    const keepAssignments = canReuseAssignments
+      ? editingCategory.assignments
+      : undefined;
 
     const base: Category = {
       name: name.trim(),

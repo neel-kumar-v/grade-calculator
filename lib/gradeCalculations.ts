@@ -94,10 +94,10 @@ function pointsToGoalGrade(
   const dropCount = Math.floor(category.drop_policy?.drop_count ?? 0);
   if (dropCount > 0 && working.length > 0) {
     const effectiveDrop = Math.min(dropCount, working.length);
+    // Never drop every entry — that would falsely treat progress as 100%.
     working = [...working]
       .sort((a, b) => a.score - b.score)
-      .slice(effectiveDrop);
-    if (working.length === 0) return 1;
+      .slice(Math.min(effectiveDrop, working.length - 1));
   }
 
   const earned = working.reduce((sum, a) => sum + Math.max(0, a.score), 0);
