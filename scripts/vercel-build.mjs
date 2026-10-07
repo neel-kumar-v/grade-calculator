@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
 
 function run(command, args) {
+  // Do not use shell:true — it splits `--cmd "npm run build"` into positional
+  // args and breaks `convex deploy` on Vercel Linux.
   const result = spawnSync(command, args, {
     stdio: "inherit",
-    shell: true,
     env: process.env,
   });
   if ((result.status ?? 1) !== 0) {
@@ -14,7 +15,7 @@ function run(command, args) {
 const isProduction = process.env.VERCEL_ENV === "production";
 
 if (isProduction) {
-  // Push Convex functions/schema to prod, then build Next with injected URL.
+  // target: prod (CONVEX_DEPLOY_KEY) — push schema/functions, then Next build.
   run("npx", ["convex", "deploy", "--cmd", "npm run build"]);
 } else {
   // Preview/dev must not use a production CONVEX_DEPLOY_KEY.
