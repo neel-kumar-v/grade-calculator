@@ -48,7 +48,8 @@ function categoryGrade(
 }
 
 function finalCourseGrade(categories: Category[]): number {
-  return sharedFinalCourseGrade(categories as never);
+  // Template previews have no per-course toggle; keep normalizing.
+  return sharedFinalCourseGrade(categories as never, true);
 }
 
 export default function TemplatePage({ params }: PageProps) {

@@ -113,6 +113,7 @@ export function CreateCourseModal({
           : (isEditMode ? editingCourse?.categories : undefined),
         templateId: isEditMode ? editingCourse?.templateId : undefined,
         importedTemplateId: isEditMode ? editingCourse?.importedTemplateId : undefined,
+        normalize_weights: isEditMode ? editingCourse?.normalize_weights : undefined,
       };
 
       if (isEditMode) {

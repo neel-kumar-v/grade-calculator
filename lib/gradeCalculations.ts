@@ -155,19 +155,25 @@ export function categoryGrade(
   return sumMax > 0 ? sumScore / sumMax : 0;
 }
 
-export function finalCourseGrade(categories: CategoryForGrade[]): number {
+export function finalCourseGrade(
+  categories: CategoryForGrade[],
+  normalizeWeights = false
+): number {
   if (!categories.length) return 0;
   let numerator = 0;
-  let denominator = 0;
+  let weightsSum = 0;
   for (const cat of categories) {
     const grade = categoryGrade(cat, categories);
     if (cat.extra_credit) {
       numerator += cat.weight * grade;
     } else {
       numerator += cat.weight * grade;
-      denominator += cat.weight;
+      weightsSum += cat.weight;
     }
   }
+  // Default (disabled): fixed denominator of 100.
+  // Opt-in: normalize to the actual sum of non-extra-credit weights.
+  const denominator = normalizeWeights ? weightsSum : 100;
   if (denominator <= 0) return 0;
   return numerator / denominator;
 }

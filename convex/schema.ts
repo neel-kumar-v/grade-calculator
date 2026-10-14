@@ -43,6 +43,8 @@ export const course = v.object({
   categories: v.optional(v.array(category)),
   templateId: v.optional(v.id("templates")),
   importedTemplateId: v.optional(v.id("templates")),
+  /** Opt-in: divide by sum of weights instead of fixed 100. Missing/false = denominator 100. */
+  normalize_weights: v.optional(v.boolean()),
 });
 
 export const gradingPeriodInput = v.object({

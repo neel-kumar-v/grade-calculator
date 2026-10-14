@@ -11,6 +11,7 @@ import {
   AccordionTrigger,
 } from "./ui/accordion";
 import { Button } from "./ui/button";
+import { Checkbox } from "./ui/checkbox";
 import { Input } from "./ui/input";
 import { CreateCategoryModal } from "./CreateCategoryModal";
 import { CreateCourseModal } from "./CreateCourseModal";
@@ -82,7 +83,10 @@ function categoryGrade(category: Category, allCategories?: Category[]): number {
 }
 
 function finalCourseGrade(course: Course): number {
-  return sharedFinalCourseGrade((course.categories ?? []) as never);
+  return sharedFinalCourseGrade(
+    (course.categories ?? []) as never,
+    course.normalize_weights ?? false
+  );
 }
 
 export function CourseCategories({
@@ -213,6 +217,20 @@ export function CourseCategories({
       courseIndex,
       course: normalizeForSave(next),
     });
+  };
+
+  const setNormalizeWeights = (checked: boolean) => {
+    if (whatIf) {
+      setDraftCourse((prev) =>
+        prev ? { ...prev, normalize_weights: checked } : prev
+      );
+    } else {
+      setLiveCourse((prev) => {
+        const next = { ...prev, normalize_weights: checked };
+        updateLocalAndPersist(next);
+        return next;
+      });
+    }
   };
 
   const setCategory = (index: number, updater: (c: Category) => Category) => {
@@ -524,17 +542,25 @@ export function CourseCategories({
         </div>
       )}
       {!normalized.manual && (() => {
-        const totalWeight = (normalized.categories ?? [])
+        const totalWeight = (workingCourse.categories ?? [])
           .filter(cat => !cat.extra_credit)
           .reduce((sum, cat) => sum + cat.weight, 0);
         const weightsAddUp = Math.abs(totalWeight - 100) < 0.01; // Allow small floating point differences
         if (!weightsAddUp) {
+          const normalizeChecked = workingCourse.normalize_weights ?? false;
           return (
-            <div className="p-4 rounded-lg bg-destructive/10">
+            <div className="p-4 rounded-lg bg-destructive/10 flex flex-col gap-3">
               <p className="text-sm text-destructive/75 flex flex-row gap-2 items-center">
                 <TriangleAlert className="size-4" />
                 Category weights do not add up to 100% (currently {totalWeight.toFixed(2)}%).
               </p>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <Checkbox
+                  checked={normalizeChecked}
+                  onCheckedChange={(checked) => setNormalizeWeights(checked === true)}
+                />
+                Normalize to {totalWeight.toFixed(2)}% instead of 100%
+              </label>
             </div>
           );
         }
