@@ -4,8 +4,9 @@ import {
   Authenticated,
   AuthLoading,
   Unauthenticated,
-  useQuery,
 } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
+import { useConvexBackendHealth } from "@/components/convex-backend-health";
 import { api } from "../convex/_generated/api";
 import { SignIn } from "../components/auth/SignIn";
 import GradingPeriods from "../components/GradingPeriods";
@@ -39,17 +40,24 @@ function UnauthWrapper({
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const gradingPeriods = useQuery(api.gradingPeriods.get);
-
+  const { outageMessage } = useConvexBackendHealth();
+  const gradingPeriods = useConvexQuery(api.gradingPeriods.get);
 
   useEffect(() => {
     document.title = "Heavyweight";
   }, []);
 
-
   return (
     <main className={`flex min-h-[90vh] container max-w-2xl  mx-auto flex-col px-6 bg-background ${isAuthenticated ? 'items-start justify-start' : 'items-center justify-center'}`}>
-      <AuthLoading>Loading... </AuthLoading>
+      <AuthLoading>
+        {outageMessage ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Connecting to Convex...
+          </div>
+        ) : (
+          "Loading... "
+        )}
+      </AuthLoading>
       <Unauthenticated>
         <UnauthWrapper setIsAuthenticated={setIsAuthenticated}>
           <SignIn />

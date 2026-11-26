@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
 import { api } from "../../convex/_generated/api";
 import {
   Dialog,
@@ -130,7 +131,7 @@ export function ImportTemplateModal({
   onOpenChange,
   onImport,
 }: ImportTemplateModalProps) {
-  const settings = useQuery(api.settings.get);
+  const settings = useConvexQuery(api.settings.get);
   const updateSettings = useMutation(api.settings.update);
 
   const [searchQuery, setSearchQuery] = useState("");

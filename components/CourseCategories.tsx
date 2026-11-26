@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
 import { api } from "../convex/_generated/api";
 import type { Doc, Id } from "../convex/_generated/dataModel";
 import {
@@ -117,7 +118,7 @@ export function CourseCategories({
   const workingCourse = whatIf && draftCourse ? draftCourse : liveCourse;
 
   // Query template info for this course to determine if current user is creator
-  const templateInfo = useQuery(
+  const templateInfo = useConvexQuery(
     api.templates.getTemplateForCourse,
     {
       templateId: workingCourse.templateId,

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import {
@@ -60,7 +61,7 @@ export function PublishTemplateModal({
   const createTemplate = useMutation(api.templates.create);
   const updateTemplate = useMutation(api.templates.update);
   const updateCourse = useMutation(api.gradingPeriods.updateCourse);
-  const settings = useQuery(api.settings.get);
+  const settings = useConvexQuery(api.settings.get);
   const updateSettings = useMutation(api.settings.update);
 
   const isEditMode = Boolean(existingTemplate && existingTemplate.isCreator && !existingTemplate.isImported);
@@ -212,9 +213,9 @@ export function PublishTemplateModal({
       }
 
       handleClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`Failed to ${isEditMode ? "update" : "publish"} template:`, error);
-      const message = error?.message || `Failed to ${isEditMode ? "update" : "publish"} template. Please try again.`;
+      const message = (error as { message?: string })?.message || `Failed to ${isEditMode ? "update" : "publish"} template. Please try again.`;
       toast.error(message);
     } finally {
       setIsSubmitting(false);

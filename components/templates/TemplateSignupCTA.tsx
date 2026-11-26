@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
 import { Unauthenticated } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "../ui/button";
@@ -32,7 +33,7 @@ export function TemplateSignupCTA({ templateId }: TemplateSignupCTAProps) {
   const updateSettings = useMutation(api.settings.update);
   const createGradingPeriod = useMutation(api.gradingPeriods.create);
   const addCourse = useMutation(api.gradingPeriods.addCourse);
-  const settings = useQuery(api.settings.get);
+  const settings = useConvexQuery(api.settings.get);
 
   const [showSignIn, setShowSignIn] = useState(false);
   const [isImporting, setIsImporting] = useState(false);

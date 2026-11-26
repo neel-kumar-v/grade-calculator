@@ -1,7 +1,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
@@ -32,7 +32,7 @@ export function SignIn({
   const router = useRouter();
   const [step, setStep] = useState<"signUp" | "signIn">(initialStep);
   const [justSignedUp, setJustSignedUp] = useState(false);
-  const settings = useQuery(api.settings.get);
+  const settings = useConvexQuery(api.settings.get);
 
   // Handle redirect after successful signup
   useEffect(() => {
