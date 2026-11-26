@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
 import { api } from "../../convex/_generated/api";
 import { Card, CardTitle } from "../../components/ui/card";
 import { Combobox } from "../../components/ui/combobox";
@@ -53,7 +54,7 @@ async function fetchTemplates(
 }
 
 export default function TemplateIndexPage() {
-  const settings = useQuery(api.settings.get);
+  const settings = useConvexQuery(api.settings.get);
   const updateSettings = useMutation(api.settings.update);
 
   const [searchQuery, setSearchQuery] = useState("");

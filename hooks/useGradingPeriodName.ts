@@ -1,9 +1,7 @@
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "./use-convex-query";
 import { api } from "../convex/_generated/api";
 
 export function useGradingPeriodName(): string {
-  const settings = useQuery(api.settings.get);
+  const settings = useConvexQuery(api.settings.get);
   return settings?.gradingPeriodName || "Semesters";
 }
-
-

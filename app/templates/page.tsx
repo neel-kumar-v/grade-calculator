@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "next-view-transitions";
 import { useRouter } from "next/navigation";
-import { useQuery, useMutation, useConvexAuth } from "convex/react";
+import { useMutation, useConvexAuth } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
+import { useConvexBackendHealth } from "@/components/convex-backend-health";
 import { api } from "../../convex/_generated/api";
 import { useGradingPeriodName } from "../../hooks/useGradingPeriodName";
 import { Input } from "../../components/ui/input";
@@ -322,9 +324,10 @@ function TemplateCard({
 
 export default function TemplatesPage() {
   const { isAuthenticated } = useConvexAuth();
-  const settings = useQuery(api.settings.get);
+  const { outageMessage } = useConvexBackendHealth();
+  const settings = useConvexQuery(api.settings.get);
   const updateSettings = useMutation(api.settings.update);
-  const gradingPeriods = useQuery(
+  const gradingPeriods = useConvexQuery(
     api.gradingPeriods.get,
     isAuthenticated ? {} : "skip"
   );
@@ -349,13 +352,13 @@ export default function TemplatesPage() {
 
   // Preload user's university from settings once loaded
   useEffect(() => {
-    if (settings !== undefined && !settingsLoaded) {
+    if ((settings !== undefined || outageMessage) && !settingsLoaded) {
       if (settings?.university) {
         setUniversity(settings.university);
       }
       setSettingsLoaded(true);
     }
-  }, [settings, settingsLoaded]);
+  }, [settings, settingsLoaded, outageMessage]);
 
   const loadTemplates = useCallback(
     async (query: string, uni: string, pageNum: number, append: boolean) => {

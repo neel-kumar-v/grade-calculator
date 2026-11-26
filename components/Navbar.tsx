@@ -2,7 +2,8 @@
 
 import { Link } from "next-view-transitions";
 import { usePathname } from "next/navigation";
-import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+import { Authenticated, Unauthenticated } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
 import { Weight } from "lucide-react";
 import { api } from "../convex/_generated/api";
 import { useGradingPeriodName } from "../hooks/useGradingPeriodName";
@@ -29,10 +30,10 @@ interface NavContext {
   courseIndex: number | null;
   isTemplateRoute: boolean;
   gradingPeriods:
-    | ReturnType<typeof useQuery<typeof api.gradingPeriods.get>>
+    | ReturnType<typeof useConvexQuery<typeof api.gradingPeriods.get>>
     | undefined;
   currentGradingPeriod:
-    | ReturnType<typeof useQuery<typeof api.gradingPeriods.getById>>
+    | ReturnType<typeof useConvexQuery<typeof api.gradingPeriods.getById>>
     | undefined;
 }
 
@@ -52,9 +53,9 @@ function useNavContext(): NavContext {
       ? courseIndexRaw
       : null;
 
-  const gradingPeriods = useQuery(api.gradingPeriods.get, {});
+  const gradingPeriods = useConvexQuery(api.gradingPeriods.get, {});
 
-  const currentGradingPeriod = useQuery(
+  const currentGradingPeriod = useConvexQuery(
     api.gradingPeriods.getById,
     gradingPeriodId && !isTemplateRoute
       ? { id: gradingPeriodId as Id<"gradingPeriods"> }
@@ -81,10 +82,10 @@ function GradingPeriodNavItem({
   depth: number;
   gradingPeriodId: string | null;
   gradingPeriods:
-    | ReturnType<typeof useQuery<typeof api.gradingPeriods.get>>
+    | ReturnType<typeof useConvexQuery<typeof api.gradingPeriods.get>>
     | undefined;
   currentGradingPeriod:
-    | ReturnType<typeof useQuery<typeof api.gradingPeriods.getById>>
+    | ReturnType<typeof useConvexQuery<typeof api.gradingPeriods.getById>>
     | undefined;
   isTemplateRoute?: boolean;
 }) {
@@ -170,7 +171,7 @@ function CourseNavItem({
   gradingPeriodId: string | null;
   courseIndex: number | null;
   currentGradingPeriod:
-    | ReturnType<typeof useQuery<typeof api.gradingPeriods.getById>>
+    | ReturnType<typeof useConvexQuery<typeof api.gradingPeriods.getById>>
     | undefined;
 }) {
   if (!gradingPeriodId || currentGradingPeriod === null) return null;

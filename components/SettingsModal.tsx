@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
+import { useConvexBackendHealth } from "@/components/convex-backend-health";
 import { api } from "../convex/_generated/api";
 import { Check, Plus, Trash, Loader2 } from "lucide-react";
 import {
@@ -30,7 +32,8 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const settings = useQuery(api.settings.get);
+  const { outageMessage } = useConvexBackendHealth();
+  const settings = useConvexQuery(api.settings.get);
   const updateSettings = useMutation(api.settings.update);
   const recalculateGPAs = useMutation(api.settings.recalculateAllGPAs);
 
@@ -45,7 +48,12 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   // Load settings when they're available, or initialize defaults
   useEffect(() => {
-    if (settings === undefined) return; // Still loading
+    if (settings === undefined) {
+      if (outageMessage && !isInitialized && open) {
+        setIsInitialized(true);
+      }
+      return;
+    }
     
     if (settings !== null) {
       // Settings exist, load them
@@ -73,7 +81,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         university: undefined,
       }).catch(console.error);
     }
-  }, [settings, isInitialized, open, updateSettings]);
+  }, [settings, isInitialized, open, updateSettings, outageMessage]);
 
   // Get the current scale for display
   const currentScale = useMemo(() => {

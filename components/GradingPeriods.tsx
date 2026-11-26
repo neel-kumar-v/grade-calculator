@@ -2,7 +2,8 @@
 import { useState, useMemo } from "react";
 import { Link } from "next-view-transitions";
 import { Calendar, Plus, Pencil } from "lucide-react";
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
+import { useConvexBackendHealth } from "@/components/convex-backend-health";
 import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
 import { CreateGradingPeriodModal } from "./CreateGradingPeriodModal";
@@ -113,7 +114,8 @@ function calculateOverallCoreGPA(gradingPeriods: Doc<"gradingPeriods">[], scale:
 export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGradingPeriod, setEditingGradingPeriod] = useState<Doc<"gradingPeriods"> | null>(null);
-  const settings = useQuery(api.settings.get);
+  const { outageMessage } = useConvexBackendHealth();
+  const settings = useConvexQuery(api.settings.get);
   const gradingPeriodName = useGradingPeriodName();
 
   usePageShortcuts({
@@ -159,7 +161,19 @@ export default function GradingPeriods({ gradingPeriods }: GradingPeriodsProps) 
   let content = null;
 
   if (gradingPeriods === undefined) {
-    content = <div>Loading...</div>;
+    if (outageMessage) {
+      content = (
+        <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+          <Calendar className="size-16 text-muted-foreground opacity-50" />
+          <h2 className="text-xl font-semibold">Unable to load {gradingPeriodName.toLowerCase()}</h2>
+          <p className="text-muted-foreground text-sm max-w-md">
+            Data is currently unavailable while Convex is offline. Any saved records will reappear once the backend is restored.
+          </p>
+        </div>
+      );
+    } else {
+      content = <div>Loading...</div>;
+    }
   } else if (gradingPeriods.length === 0) {
     content = (
       <div className="flex flex-col items-center justify-center py-16 gap-6">

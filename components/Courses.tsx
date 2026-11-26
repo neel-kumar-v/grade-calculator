@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "next-view-transitions";
 import { BookOpen, Plus, Pencil } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
 import { api } from "../convex/_generated/api";
 import { Button } from "./ui/button";
 import { CreateCourseModal } from "./CreateCourseModal";
@@ -28,7 +29,7 @@ export function Courses({ gradingPeriodId, gradingPeriod }: CoursesProps) {
   const [isGradingPeriodModalOpen, setIsGradingPeriodModalOpen] = useState(false);
   const [editingCourseIndex, setEditingCourseIndex] = useState<number | null>(null);
   const updateGrades = useMutation(api.gradingPeriods.updateGrades);
-  const settings = useQuery(api.settings.get);
+  const settings = useConvexQuery(api.settings.get);
   const gradingPeriodName = useGradingPeriodName();
 
   usePageShortcuts({

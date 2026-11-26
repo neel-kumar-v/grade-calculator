@@ -1,7 +1,8 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "@/hooks/use-convex-query";
+import { useConvexBackendHealth } from "@/components/convex-backend-health";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { NotFound } from "../../../components/NotFound";
@@ -55,7 +56,8 @@ function finalCourseGrade(categories: Category[]): number {
 export default function TemplatePage({ params }: PageProps) {
   const { templateId } = use(params);
   const templateIdTyped = templateId as Id<"templates">;
-  const template = useQuery(api.templates.getById, { id: templateIdTyped });
+  const { outageMessage } = useConvexBackendHealth();
+  const template = useConvexQuery(api.templates.getById, { id: templateIdTyped });
 
   const [localCategories, setLocalCategories] = useState<
     (Category & { assignments?: Assignment[] })[]
@@ -208,6 +210,15 @@ export default function TemplatePage({ params }: PageProps) {
   }, [template]);
 
   if (template === undefined) {
+    if (outageMessage) {
+      return (
+        <div className="flex flex-col container max-w-2xl mx-auto py-16 gap-4">
+          <p className="rounded-lg border border-amber-500/30 bg-amber-950/40 px-3 py-2 text-sm text-amber-100">
+            Template details are paused while Convex is offline. {outageMessage}
+          </p>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col container max-w-2xl mx-auto py-16 gap-4">
         <div>Loading template...</div>
